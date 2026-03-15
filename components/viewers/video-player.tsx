@@ -136,8 +136,15 @@ export function VideoPlayer({ url, canDownload = true }: VideoPlayerProps) {
   };
 
   const toggleFullscreen = useCallback(async () => {
-    // On mobile: use CSS-based fullscreen to prevent native controls
-    if (isMobile || !canDownload) {
+    // ALWAYS use CSS-based fullscreen when downloads are disabled
+    // This prevents mobile browsers from showing native controls with download options
+    if (!canDownload) {
+      setIsFullscreen(prev => !prev);
+      return;
+    }
+
+    // On mobile with downloads allowed: still use CSS fullscreen to avoid native controls
+    if (isMobile) {
       setIsFullscreen(prev => !prev);
       return;
     }
@@ -195,9 +202,19 @@ export function VideoPlayer({ url, canDownload = true }: VideoPlayerProps) {
     }
   }, [isPlaying]);
 
-  const handleTouchStart = useCallback(() => {
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
     showControlsTemporarily();
   }, [showControlsTemporarily]);
+
+  // Prevent native video fullscreen on double-tap (mobile)
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    if (!canDownload) {
+      e.preventDefault();
+      e.stopPropagation();
+      // Toggle play instead of fullscreen on double-click
+      togglePlay();
+    }
+  }, [canDownload]);
 
   if (error) {
     return (
@@ -228,6 +245,7 @@ export function VideoPlayer({ url, canDownload = true }: VideoPlayerProps) {
       onMouseLeave={() => setShowControls(isPlaying ? false : true)}
       onTouchStart={handleTouchStart}
       onContextMenu={handleContextMenu}
+      onDoubleClick={handleDoubleClick}
       style={isFullscreen && (isMobile || !canDownload) ? { 
         position: 'fixed', 
         top: 0, 
@@ -264,11 +282,35 @@ export function VideoPlayer({ url, canDownload = true }: VideoPlayerProps) {
         onContextMenu={handleContextMenu}
         controlsList="nodownload nofullscreen noremoteplayback"
         disablePictureInPicture
+        disableRemotePlayback
         playsInline
         preload="metadata"
         controls={false}
-        style={{ WebkitTouchCallout: 'none', userSelect: 'none' }}
+        x-webkit-airplay="deny"
+        style={{ 
+          WebkitTouchCallout: 'none', 
+          userSelect: 'none',
+          // Hide any browser-injected video controls
+          WebkitMediaControls: 'none',
+        } as React.CSSProperties}
       />
+      {/* Additional overlay to block browser-injected controls */}
+      {!canDownload && (
+        <div 
+          className="absolute inset-0 z-[15]"
+          style={{ 
+            pointerEvents: 'none',
+            // This invisible layer sits above the video but below our controls
+          }}
+        >
+          {/* Bottom area blocker for browser-injected fullscreen/PiP buttons */}
+          <div 
+            className="absolute bottom-0 left-0 right-0 h-20 pointer-events-auto"
+            onClick={(e) => { e.stopPropagation(); togglePlay(); showControlsTemporarily(); }}
+            onContextMenu={handleContextMenu}
+          />
+        </div>
+      )}
 
       {/* Loading Overlay */}
       {isLoading && (
