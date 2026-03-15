@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { FolderPlus, Upload, Folder, FileText, Video, Presentation, Trash2, ChevronRight, ChevronDown, Link2 } from "lucide-react"
+import { FolderPlus, Upload, Folder, FileText, Video, Presentation, Trash2, ChevronRight, ChevronDown, Link2, X } from "lucide-react"
+import { FileViewer } from "@/components/viewers/file-viewer"
 import type { Folder as FolderType, FileItem } from "@/lib/types"
 
 interface FolderWithChildren extends FolderType {
@@ -23,6 +24,7 @@ export default function TeacherContentPage() {
   const [allFolders, setAllFolders] = useState<FolderType[]>([])
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<FileItem | null>(null)
   const [loading, setLoading] = useState(true)
   
   // Dialog states
@@ -299,8 +301,11 @@ export default function TeacherContentPage() {
             {folder.files.map((file) => (
               <div
                 key={file.id}
-                className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted transition-colors group"
+                className={`flex items-center gap-2 p-2 rounded-lg hover:bg-muted transition-colors group cursor-pointer ${
+                  selectedFile?.id === file.id ? "bg-primary/10 border border-primary/30" : ""
+                }`}
                 style={{ paddingLeft: `${(depth + 1) * 16 + 24}px` }}
+                onClick={() => setSelectedFile(file)}
               >
                 {getFileIcon(file.type)}
                 <span className="flex-1 text-sm">{file.name}</span>
@@ -308,7 +313,10 @@ export default function TeacherContentPage() {
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                  onClick={() => handleDeleteFile(file.id)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDeleteFile(file.id)
+                  }}
                 >
                   <Trash2 className="h-3 w-3 text-destructive" />
                 </Button>
@@ -511,21 +519,57 @@ export default function TeacherContentPage() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Folder Structure</CardTitle>
-          <CardDescription>Click on folders to expand and view contents</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {folders.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">
-              No folders yet. Create your first folder to get started.
-            </p>
-          ) : (
-            <div className="space-y-1">{folders.map((folder) => renderFolder(folder))}</div>
-          )}
-        </CardContent>
-      </Card>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Folder Structure</CardTitle>
+            <CardDescription>Click on folders to expand and view contents</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {folders.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">
+                No folders yet. Create your first folder to get started.
+              </p>
+            ) : (
+              <div className="space-y-1">{folders.map((folder) => renderFolder(folder))}</div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* File Preview Panel */}
+        <Card className="lg:sticky lg:top-6 h-fit">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div>
+              <CardTitle>File Preview</CardTitle>
+              <CardDescription>
+                {selectedFile ? selectedFile.name : "Select a file to preview"}
+              </CardDescription>
+            </div>
+            {selectedFile && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSelectedFile(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent>
+            {selectedFile ? (
+              <div className="h-[500px] border rounded-lg overflow-hidden">
+                <FileViewer file={selectedFile} canDownload={true} />
+              </div>
+            ) : (
+              <div className="h-[500px] flex items-center justify-center border rounded-lg bg-muted/50">
+                <p className="text-muted-foreground text-center">
+                  Click on a file from the folder tree to preview it here
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
