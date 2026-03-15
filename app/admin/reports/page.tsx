@@ -9,8 +9,15 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Search, Users, BookOpen, Award, TrendingUp, Eye, CheckCircle, XCircle } from "lucide-react"
+import { Search, Users, BookOpen, Award, TrendingUp, Eye, CheckCircle, XCircle, FileText, FolderOpen } from "lucide-react"
 import type { Profile } from "@/lib/types"
+
+interface CompletedLesson {
+  id: string
+  file_name: string
+  folder_path: string
+  completed_at: string
+}
 
 interface StudentProgressReport {
   student: Profile
@@ -53,6 +60,9 @@ export default function AdminReportsPage() {
   const [selectedAttempt, setSelectedAttempt] = useState<ExamAttemptWithDetails | null>(null)
   const [questionDetails, setQuestionDetails] = useState<QuestionDetail[]>([])
   const [loadingDetails, setLoadingDetails] = useState(false)
+  const [selectedStudent, setSelectedStudent] = useState<StudentProgressReport | null>(null)
+  const [completedLessonsList, setCompletedLessonsList] = useState<CompletedLesson[]>([])
+  const [loadingLessons, setLoadingLessons] = useState(false)
 
   useEffect(() => {
     loadReports()
@@ -151,6 +161,61 @@ export default function AdminReportsPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  async function viewStudentProgress(report: StudentProgressReport) {
+    setSelectedStudent(report)
+    setLoadingLessons(true)
+
+    const supabase = createClient()
+    
+    // Load completed lessons for this student with file and folder info
+    const { data: progressData } = await supabase
+      .from("student_progress")
+      .select(`
+        id,
+        completed_at,
+        file:files(id, name, folder_id)
+      `)
+      .eq("student_id", report.student.id)
+      .eq("status", "completed")
+      .order("completed_at", { ascending: false })
+
+    // Load folders to get paths
+    const { data: folders } = await supabase
+      .from("folders")
+      .select("id, name, parent_id")
+
+    // Build folder path lookup
+    const folderMap = new Map(folders?.map(f => [f.id, f]) || [])
+    
+    function getFolderPath(folderId: string | null): string {
+      if (!folderId) return "Root"
+      const parts: string[] = []
+      let currentId: string | null = folderId
+      while (currentId) {
+        const folder = folderMap.get(currentId)
+        if (folder) {
+          parts.unshift(folder.name)
+          currentId = folder.parent_id
+        } else {
+          break
+        }
+      }
+      return parts.join(" / ") || "Root"
+    }
+
+    const lessons: CompletedLesson[] = (progressData || [])
+      .filter(p => p.file)
+      .map(p => ({
+        id: p.id,
+        file_name: (p.file as any).name,
+        folder_path: getFolderPath((p.file as any).folder_id),
+        completed_at: p.completed_at,
+      }))
+
+    setCompletedLessonsList(lessons)
+    setLoadingLessons(false)
   }
 
   async function viewAttemptDetails(attempt: ExamAttemptWithDetails) {
@@ -310,6 +375,7 @@ export default function AdminReportsPage() {
                     <TableHead>Completed</TableHead>
                     <TableHead>Total</TableHead>
                     <TableHead>Progress</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -331,6 +397,16 @@ export default function AdminReportsPage() {
                           </div>
                           <span className="text-sm">{report.progressPercentage}%</span>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => viewStudentProgress(report)}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -403,6 +479,51 @@ export default function AdminReportsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Student Progress Dialog */}
+      <Dialog open={!!selectedStudent} onOpenChange={() => setSelectedStudent(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Completed Lessons: {selectedStudent?.student.full_name || "Student"}
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              {selectedStudent?.completedLessons} of {selectedStudent?.totalLessons} lessons completed ({selectedStudent?.progressPercentage}%)
+            </p>
+          </DialogHeader>
+
+          {loadingLessons ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : completedLessonsList.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">
+              No completed lessons found
+            </p>
+          ) : (
+            <div className="space-y-2 mt-4">
+              {completedLessonsList.map((lesson) => (
+                <div
+                  key={lesson.id}
+                  className="flex items-center gap-3 p-3 rounded-lg border bg-green-50 border-green-200"
+                >
+                  <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{lesson.file_name}</p>
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <FolderOpen className="h-3 w-3" />
+                      <span className="truncate">{lesson.folder_path}</span>
+                    </div>
+                  </div>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {new Date(lesson.completed_at).toLocaleDateString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Exam Details Dialog */}
       <Dialog open={!!selectedAttempt} onOpenChange={() => setSelectedAttempt(null)}>

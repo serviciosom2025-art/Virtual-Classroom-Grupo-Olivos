@@ -6,6 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Spinner } from "@/components/ui/spinner";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   BarChart3,
   TrendingUp,
@@ -13,7 +18,14 @@ import {
   BookOpen,
   ClipboardList,
   Target,
+  Eye,
+  CheckCircle,
+  XCircle,
+  FolderOpen,
+  Search,
+  Award,
 } from "lucide-react";
+import type { Profile } from "@/lib/types";
 
 interface ReportData {
   totalStudents: number;
@@ -27,9 +39,58 @@ interface ReportData {
   popularContent: { name: string; completions: number }[];
 }
 
+interface StudentProgressReport {
+  student: Profile;
+  completedLessons: number;
+  totalLessons: number;
+  progressPercentage: number;
+}
+
+interface CompletedLesson {
+  id: string;
+  file_name: string;
+  folder_path: string;
+  completed_at: string;
+}
+
+interface ExamAttemptWithDetails {
+  id: string;
+  student_id: string;
+  exam_id: string;
+  score: number;
+  total_questions: number;
+  attempt_number: number;
+  completed_at: string;
+  answers: Record<string, string>;
+  student_name: string;
+  student_email: string;
+  exam_title: string;
+}
+
+interface QuestionDetail {
+  id: string;
+  question: string;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
+  correct_answer: string;
+  student_answer: string;
+  is_correct: boolean;
+}
+
 export default function TeacherReportsPage() {
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [progressReports, setProgressReports] = useState<StudentProgressReport[]>([]);
+  const [examAttempts, setExamAttempts] = useState<ExamAttemptWithDetails[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState<StudentProgressReport | null>(null);
+  const [completedLessonsList, setCompletedLessonsList] = useState<CompletedLesson[]>([]);
+  const [loadingLessons, setLoadingLessons] = useState(false);
+  const [selectedAttempt, setSelectedAttempt] = useState<ExamAttemptWithDetails | null>(null);
+  const [questionDetails, setQuestionDetails] = useState<QuestionDetail[]>([]);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   const supabase = createClient();
 
@@ -115,6 +176,59 @@ export default function TeacherReportsPage() {
         topExams,
         popularContent,
       });
+
+      // Load student progress reports
+      const students = studentsRes.data || [];
+      const totalFiles = filesRes.count || 0;
+      const progressData: StudentProgressReport[] = [];
+      
+      for (const student of students) {
+        const completedCount = (progressRes.data || []).filter(
+          (p) => p.student_id === student.id
+        ).length;
+        
+        progressData.push({
+          student: student as Profile,
+          completedLessons: completedCount,
+          totalLessons: totalFiles,
+          progressPercentage: totalFiles ? Math.round((completedCount / totalFiles) * 100) : 0,
+        });
+      }
+      setProgressReports(progressData);
+
+      // Load exam attempts with details
+      const allAttempts: ExamAttemptWithDetails[] = (attemptsRes.data || []).map(attempt => {
+        const student = students.find(s => s.id === attempt.student_id);
+        const exam = exams.find(e => e.id === attempt.exam_id);
+        return {
+          id: attempt.id,
+          student_id: attempt.student_id,
+          exam_id: attempt.exam_id,
+          score: attempt.score,
+          total_questions: attempt.total_questions,
+          attempt_number: attempt.attempt_number,
+          completed_at: attempt.completed_at,
+          answers: attempt.answers || {},
+          student_name: student?.full_name || "Unknown",
+          student_email: student?.email || "",
+          exam_title: exam?.title || "Unknown Exam",
+        };
+      });
+
+      // Group by student_id + exam_id and keep only the highest score
+      const highestScoreMap = new Map<string, ExamAttemptWithDetails>();
+      allAttempts.forEach(attempt => {
+        const key = `${attempt.student_id}-${attempt.exam_id}`;
+        const existing = highestScoreMap.get(key);
+        if (!existing || attempt.score > existing.score) {
+          highestScoreMap.set(key, attempt);
+        }
+      });
+
+      const highestScoreAttempts = Array.from(highestScoreMap.values())
+        .sort((a, b) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime());
+      
+      setExamAttempts(highestScoreAttempts);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -125,6 +239,104 @@ export default function TeacherReportsPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  async function viewStudentProgress(report: StudentProgressReport) {
+    setSelectedStudent(report);
+    setLoadingLessons(true);
+
+    const { data: progressData } = await supabase
+      .from("student_progress")
+      .select(`
+        id,
+        completed_at,
+        file:files(id, name, folder_id)
+      `)
+      .eq("student_id", report.student.id)
+      .eq("status", "completed")
+      .order("completed_at", { ascending: false });
+
+    const { data: folders } = await supabase
+      .from("folders")
+      .select("id, name, parent_id");
+
+    const folderMap = new Map(folders?.map(f => [f.id, f]) || []);
+    
+    function getFolderPath(folderId: string | null): string {
+      if (!folderId) return "Root";
+      const parts: string[] = [];
+      let currentId: string | null = folderId;
+      while (currentId) {
+        const folder = folderMap.get(currentId);
+        if (folder) {
+          parts.unshift(folder.name);
+          currentId = folder.parent_id;
+        } else {
+          break;
+        }
+      }
+      return parts.join(" / ") || "Root";
+    }
+
+    const lessons: CompletedLesson[] = (progressData || [])
+      .filter(p => p.file)
+      .map(p => ({
+        id: p.id,
+        file_name: (p.file as any).name,
+        folder_path: getFolderPath((p.file as any).folder_id),
+        completed_at: p.completed_at,
+      }));
+
+    setCompletedLessonsList(lessons);
+    setLoadingLessons(false);
+  }
+
+  async function viewAttemptDetails(attempt: ExamAttemptWithDetails) {
+    setSelectedAttempt(attempt);
+    setLoadingDetails(true);
+
+    const { data: questions } = await supabase
+      .from("questions")
+      .select("*")
+      .eq("exam_id", attempt.exam_id)
+      .order("created_at");
+
+    const details: QuestionDetail[] = (questions || []).map(q => {
+      const studentAnswer = attempt.answers[q.id] || "";
+      let selectedOption = "";
+      if (studentAnswer === q.option_a) selectedOption = "A";
+      else if (studentAnswer === q.option_b) selectedOption = "B";
+      else if (studentAnswer === q.option_c) selectedOption = "C";
+      else if (studentAnswer === q.option_d) selectedOption = "D";
+      
+      return {
+        id: q.id,
+        question: q.question,
+        option_a: q.option_a,
+        option_b: q.option_b,
+        option_c: q.option_c,
+        option_d: q.option_d,
+        correct_answer: q.correct_answer,
+        student_answer: selectedOption,
+        is_correct: selectedOption === q.correct_answer,
+      };
+    });
+
+    setQuestionDetails(details);
+    setLoadingDetails(false);
+  }
+
+  const filteredProgress = progressReports.filter(
+    (r) =>
+      r.student.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.student.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredExams = examAttempts.filter(
+    (r) =>
+      r.student_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.student_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.exam_title.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   if (loading) {
     return (
@@ -288,6 +500,262 @@ export default function TeacherReportsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Search and Tabs for detailed reports */}
+      <div className="flex items-center gap-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search students or exams..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+      </div>
+
+      <Tabs defaultValue="progress" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="progress">Lesson Progress</TabsTrigger>
+          <TabsTrigger value="exams">Exam Results</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="progress">
+          <Card>
+            <CardHeader>
+              <CardTitle>Student Progress</CardTitle>
+              <CardDescription>Track lesson completion for all students</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Student</TableHead>
+                    <TableHead>Completed</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Progress</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredProgress.map((report) => (
+                    <TableRow key={report.student.id}>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{report.student.full_name || "Unnamed"}</p>
+                          <p className="text-sm text-muted-foreground">{report.student.email}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>{report.completedLessons}</TableCell>
+                      <TableCell>{report.totalLessons}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="w-24 bg-muted rounded-full h-2">
+                            <div
+                              className="bg-primary h-2 rounded-full"
+                              style={{ width: `${report.progressPercentage}%` }}
+                            />
+                          </div>
+                          <span className="text-sm">{report.progressPercentage}%</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => viewStudentProgress(report)}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="exams">
+          <Card>
+            <CardHeader>
+              <CardTitle>Exam Results</CardTitle>
+              <CardDescription>Showing highest score per student for each exam</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Student</TableHead>
+                    <TableHead>Exam</TableHead>
+                    <TableHead>Score</TableHead>
+                    <TableHead>Grade</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredExams.map((attempt) => {
+                    const percentage = Math.round((attempt.score / attempt.total_questions) * 100);
+                    return (
+                      <TableRow key={attempt.id}>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{attempt.student_name}</p>
+                            <p className="text-sm text-muted-foreground">{attempt.student_email}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium">{attempt.exam_title}</TableCell>
+                        <TableCell>{attempt.score}/{attempt.total_questions}</TableCell>
+                        <TableCell>
+                          <Badge variant={percentage >= 70 ? "default" : percentage >= 50 ? "secondary" : "destructive"}>
+                            {percentage}%
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {new Date(attempt.completed_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => viewAttemptDetails(attempt)}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+              {filteredExams.length === 0 && (
+                <p className="text-center text-muted-foreground py-8">
+                  No exam results found
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Student Progress Dialog */}
+      <Dialog open={!!selectedStudent} onOpenChange={() => setSelectedStudent(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Completed Lessons: {selectedStudent?.student.full_name || "Student"}
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              {selectedStudent?.completedLessons} of {selectedStudent?.totalLessons} lessons completed ({selectedStudent?.progressPercentage}%)
+            </p>
+          </DialogHeader>
+
+          {loadingLessons ? (
+            <div className="flex items-center justify-center py-8">
+              <Spinner className="w-8 h-8 text-blue-600" />
+            </div>
+          ) : completedLessonsList.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">
+              No completed lessons found
+            </p>
+          ) : (
+            <div className="space-y-2 mt-4">
+              {completedLessonsList.map((lesson) => (
+                <div
+                  key={lesson.id}
+                  className="flex items-center gap-3 p-3 rounded-lg border bg-green-50 border-green-200"
+                >
+                  <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{lesson.file_name}</p>
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <FolderOpen className="h-3 w-3" />
+                      <span className="truncate">{lesson.folder_path}</span>
+                    </div>
+                  </div>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {new Date(lesson.completed_at).toLocaleDateString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Exam Details Dialog */}
+      <Dialog open={!!selectedAttempt} onOpenChange={() => setSelectedAttempt(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Exam Results: {selectedAttempt?.exam_title}
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Student: {selectedAttempt?.student_name} | Score: {selectedAttempt?.score}/{selectedAttempt?.total_questions} ({selectedAttempt ? Math.round((selectedAttempt.score / selectedAttempt.total_questions) * 100) : 0}%)
+            </p>
+          </DialogHeader>
+
+          {loadingDetails ? (
+            <div className="flex items-center justify-center py-8">
+              <Spinner className="w-8 h-8 text-blue-600" />
+            </div>
+          ) : (
+            <div className="space-y-4 mt-4">
+              {questionDetails.map((q, index) => (
+                <div
+                  key={q.id}
+                  className={`p-4 rounded-lg border ${
+                    q.is_correct ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    {q.is_correct ? (
+                      <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+                    )}
+                    <div className="flex-1">
+                      <p className="font-medium mb-2">
+                        {index + 1}. {q.question}
+                      </p>
+                      <div className="grid gap-1 text-sm">
+                        {[
+                          { key: "A", value: q.option_a },
+                          { key: "B", value: q.option_b },
+                          { key: "C", value: q.option_c },
+                          { key: "D", value: q.option_d },
+                        ].filter(opt => opt.value).map((opt) => {
+                          const isCorrect = opt.key === q.correct_answer;
+                          const isStudentAnswer = opt.key === q.student_answer;
+                          return (
+                            <div
+                              key={opt.key}
+                              className={`p-2 rounded ${
+                                isCorrect
+                                  ? "bg-green-100 text-green-800 font-medium"
+                                  : isStudentAnswer && !isCorrect
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-white"
+                              }`}
+                            >
+                              <span className="font-semibold">{opt.key}.</span> {opt.value}
+                              {isCorrect && " (Correct)"}
+                              {isStudentAnswer && !isCorrect && " (Student's answer)"}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
