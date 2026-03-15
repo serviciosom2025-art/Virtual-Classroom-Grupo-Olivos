@@ -4,9 +4,11 @@ import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { FolderTree } from "@/components/folders/folder-tree";
 import { FileViewer } from "@/components/viewers/file-viewer";
+import { X } from "lucide-react";
 import type { Folder, FileItem, StudentProgress } from "@/lib/types";
 
 export default function StudentCoursesPage() {
@@ -118,8 +120,21 @@ export default function StudentCoursesPage() {
       </Card>
 
       {/* Main Content - File Viewer */}
-      <Card className="flex-1 bg-white shadow-sm overflow-hidden">
-        <CardContent className="h-full p-0">
+      <Card className="flex-1 bg-white shadow-sm overflow-hidden flex flex-col">
+        {selectedFile && (
+          <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/30">
+            <span className="font-medium text-sm truncate">{selectedFile.name}</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 flex-shrink-0"
+              onClick={() => setSelectedFile(null)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+        <CardContent className="flex-1 h-full p-0 overflow-hidden">
           {selectedFile ? (
             <FileViewer
               file={selectedFile}
