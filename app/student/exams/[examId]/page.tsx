@@ -167,9 +167,11 @@ export default function ExamTakingPage() {
     // Calculate score
     let score = 0;
     questions.forEach((q) => {
-      const selectedOption = q.shuffledOptions.find((opt) => answers[q.id] === opt.value);
-      if (selectedOption && selectedOption.key === q.correct_answer) {
-        score++;
+      if (q.shuffledOptions && answers[q.id]) {
+        const selectedOption = q.shuffledOptions.find((opt) => answers[q.id] === opt.value);
+        if (selectedOption && selectedOption.key === q.correct_answer) {
+          score++;
+        }
       }
     });
 
@@ -358,7 +360,16 @@ export default function ExamTakingPage() {
   // Taking Exam Screen
   const currentQuestion = questions[currentQuestionIndex];
   const answeredCount = Object.keys(answers).length;
-  const progressPercent = (answeredCount / questions.length) * 100;
+  const progressPercent = questions.length > 0 ? (answeredCount / questions.length) * 100 : 0;
+
+  // Safety check - if no questions or invalid index, show loading
+  if (!currentQuestion || !currentQuestion.shuffledOptions) {
+    return (
+      <div className="flex justify-center py-20">
+        <Spinner className="w-8 h-8 text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto">
