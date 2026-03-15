@@ -72,6 +72,7 @@ export default function SettingsPage() {
         .from("platform_settings")
         .update({
           platform_name: settings.platform_name,
+          login_title: settings.login_title,
           logo_url: logoUrl,
           sidebar_color: settings.sidebar_color,
           primary_color: settings.primary_color,
@@ -117,6 +118,17 @@ export default function SettingsPage() {
               onChange={(e) => setSettings({ ...settings, platform_name: e.target.value })}
               placeholder="Virtual Classroom"
             />
+            <p className="text-xs text-muted-foreground mt-1">Shown in the sidebar</p>
+          </Field>
+
+          <Field>
+            <FieldLabel>Login Page Title</FieldLabel>
+            <Input
+              value={settings.login_title || ""}
+              onChange={(e) => setSettings({ ...settings, login_title: e.target.value })}
+              placeholder="Virtual Classroom LMS"
+            />
+            <p className="text-xs text-muted-foreground mt-1">Shown on the login page</p>
           </Field>
 
           <Field>
