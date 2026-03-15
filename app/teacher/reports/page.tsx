@@ -24,7 +24,9 @@ import {
   FolderOpen,
   Search,
   Award,
+  ChevronDown,
 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Profile } from "@/lib/types";
 
 interface ReportData {
@@ -51,6 +53,18 @@ interface CompletedLesson {
   file_name: string;
   folder_path: string;
   completed_at: string;
+}
+
+interface FolderOption {
+  id: string;
+  name: string;
+  path: string;
+  depth: number;
+}
+
+interface FileWithFolder {
+  id: string;
+  folder_id: string | null;
 }
 
 interface ExamAttemptWithDetails {
@@ -91,6 +105,11 @@ export default function TeacherReportsPage() {
   const [selectedAttempt, setSelectedAttempt] = useState<ExamAttemptWithDetails | null>(null);
   const [questionDetails, setQuestionDetails] = useState<QuestionDetail[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [folders, setFolders] = useState<FolderOption[]>([]);
+  const [selectedFolderId, setSelectedFolderId] = useState<string>("all");
+  const [allFiles, setAllFiles] = useState<FileWithFolder[]>([]);
+  const [allProgressRecords, setAllProgressRecords] = useState<{student_id: string, file_id: string}[]>([]);
+  const [folderMap, setFolderMap] = useState<Map<string, {id: string, name: string, parent_id: string | null}>>(new Map());
 
   const supabase = createClient();
 
@@ -103,14 +122,66 @@ export default function TeacherReportsPage() {
         progressRes,
         resultsRes,
         attemptsRes,
+        foldersRes,
       ] = await Promise.all([
-        supabase.from("profiles").select("id", { count: "exact" }).eq("role", "student"),
-        supabase.from("files").select("id, name", { count: "exact" }),
+        supabase.from("profiles").select("id, full_name, email", { count: "exact" }).eq("role", "student"),
+        supabase.from("files").select("id, name, folder_id", { count: "exact" }),
         supabase.from("exams").select("id, title", { count: "exact" }),
         supabase.from("student_progress").select("*").eq("status", "completed"),
         supabase.from("exam_results").select("*"),
         supabase.from("exam_attempts").select("*"),
+        supabase.from("folders").select("id, name, parent_id").order("name"),
       ]);
+
+      // Build folder map and options
+      const fMap = new Map(foldersRes.data?.map(f => [f.id, f]) || []);
+      setFolderMap(fMap);
+
+      // Build folder path for each folder
+      function getFolderPath(folderId: string): string {
+        const parts: string[] = [];
+        let currentId: string | null = folderId;
+        while (currentId) {
+          const folder = fMap.get(currentId);
+          if (folder) {
+            parts.unshift(folder.name);
+            currentId = folder.parent_id;
+          } else {
+            break;
+          }
+        }
+        return parts.join(" / ");
+      }
+
+      // Calculate folder depth
+      function getFolderDepth(folderId: string): number {
+        let depth = 0;
+        let currentId: string | null = folderId;
+        while (currentId) {
+          const folder = fMap.get(currentId);
+          if (folder?.parent_id) {
+            depth++;
+            currentId = folder.parent_id;
+          } else {
+            break;
+          }
+        }
+        return depth;
+      }
+
+      // Build sorted folder options
+      const folderOptions: FolderOption[] = (foldersRes.data || [])
+        .map(f => ({
+          id: f.id,
+          name: f.name,
+          path: getFolderPath(f.id),
+          depth: getFolderDepth(f.id)
+        }))
+        .sort((a, b) => a.path.localeCompare(b.path));
+
+      setFolders(folderOptions);
+      setAllFiles(filesRes.data?.map(f => ({ id: f.id, folder_id: f.folder_id })) || []);
+      setAllProgressRecords(progressRes.data?.map(p => ({ student_id: p.student_id, file_id: p.file_id })) || []);
 
       const uniqueActiveStudents = new Set([
         ...(progressRes.data || []).map((p) => p.student_id),
@@ -325,7 +396,53 @@ export default function TeacherReportsPage() {
     setLoadingDetails(false);
   }
 
-  const filteredProgress = progressReports.filter(
+  // Helper function to get all descendant folder IDs
+  function getDescendantFolderIds(folderId: string): string[] {
+    const descendants: string[] = [folderId];
+    const queue = [folderId];
+    while (queue.length > 0) {
+      const currentId = queue.shift()!;
+      folderMap.forEach((folder, id) => {
+        if (folder.parent_id === currentId && !descendants.includes(id)) {
+          descendants.push(id);
+          queue.push(id);
+        }
+      });
+    }
+    return descendants;
+  }
+
+  // Calculate filtered progress based on folder selection
+  const filteredProgressByFolder = progressReports.map(report => {
+    if (selectedFolderId === "all") {
+      return report;
+    }
+
+    // Get all folder IDs that should be included (selected folder + descendants)
+    const includedFolderIds = getDescendantFolderIds(selectedFolderId);
+
+    // Filter files to only those in the selected folder hierarchy
+    const filteredFiles = allFiles.filter(f => 
+      f.folder_id && includedFolderIds.includes(f.folder_id)
+    );
+    const filteredFileIds = new Set(filteredFiles.map(f => f.id));
+
+    // Count completed files in the filtered set
+    const completedInFolder = allProgressRecords.filter(
+      p => p.student_id === report.student.id && filteredFileIds.has(p.file_id)
+    ).length;
+
+    const totalInFolder = filteredFiles.length;
+
+    return {
+      ...report,
+      completedLessons: completedInFolder,
+      totalLessons: totalInFolder,
+      progressPercentage: totalInFolder ? Math.round((completedInFolder / totalInFolder) * 100) : 0,
+    };
+  });
+
+  const filteredProgress = filteredProgressByFolder.filter(
     (r) =>
       r.student.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.student.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -502,7 +619,7 @@ export default function TeacherReportsPage() {
       </div>
 
       {/* Search and Tabs for detailed reports */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-wrap">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -511,6 +628,24 @@ export default function TeacherReportsPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-9"
           />
+        </div>
+        <div className="flex items-center gap-2">
+          <FolderOpen className="h-4 w-4 text-muted-foreground" />
+          <Select value={selectedFolderId} onValueChange={setSelectedFolderId}>
+            <SelectTrigger className="w-[250px]">
+              <SelectValue placeholder="Filter by folder..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Folders</SelectItem>
+              {folders.map((folder) => (
+                <SelectItem key={folder.id} value={folder.id}>
+                  <span style={{ paddingLeft: `${folder.depth * 12}px` }}>
+                    {folder.depth > 0 ? "└ " : ""}{folder.name}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

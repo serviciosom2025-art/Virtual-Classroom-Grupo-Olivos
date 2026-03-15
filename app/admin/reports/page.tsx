@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Search, Users, BookOpen, Award, TrendingUp, Eye, CheckCircle, XCircle, FileText, FolderOpen } from "lucide-react"
+import { Search, Users, BookOpen, Award, TrendingUp, Eye, CheckCircle, XCircle, FileText, FolderOpen, ChevronDown } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Profile } from "@/lib/types"
 
 interface CompletedLesson {
@@ -17,6 +18,18 @@ interface CompletedLesson {
   file_name: string
   folder_path: string
   completed_at: string
+}
+
+interface FolderOption {
+  id: string
+  name: string
+  path: string
+  depth: number
+}
+
+interface FileWithFolder {
+  id: string
+  folder_id: string | null
 }
 
 interface StudentProgressReport {
@@ -63,6 +76,11 @@ export default function AdminReportsPage() {
   const [selectedStudent, setSelectedStudent] = useState<StudentProgressReport | null>(null)
   const [completedLessonsList, setCompletedLessonsList] = useState<CompletedLesson[]>([])
   const [loadingLessons, setLoadingLessons] = useState(false)
+  const [folders, setFolders] = useState<FolderOption[]>([])
+  const [selectedFolderId, setSelectedFolderId] = useState<string>("all")
+  const [allFiles, setAllFiles] = useState<FileWithFolder[]>([])
+  const [allProgress, setAllProgress] = useState<{student_id: string, file_id: string}[]>([])
+  const [folderMap, setFolderMap] = useState<Map<string, {id: string, name: string, parent_id: string | null}>>(new Map())
 
   useEffect(() => {
     loadReports()
@@ -79,25 +97,87 @@ export default function AdminReportsPage() {
         .eq("role", "student")
         .order("full_name")
 
-      // Load total files count
-      const { count: totalFiles } = await supabase
+      // Load all files with folder info
+      const { data: files } = await supabase
         .from("files")
-        .select("*", { count: "exact", head: true })
+        .select("id, folder_id")
 
-      // Load progress for each student
+      // Load all folders
+      const { data: foldersData } = await supabase
+        .from("folders")
+        .select("id, name, parent_id")
+        .order("name")
+
+      // Build folder map and options
+      const fMap = new Map(foldersData?.map(f => [f.id, f]) || [])
+      setFolderMap(fMap)
+
+      // Build folder path for each folder
+      function getFolderPath(folderId: string): string {
+        const parts: string[] = []
+        let currentId: string | null = folderId
+        while (currentId) {
+          const folder = fMap.get(currentId)
+          if (folder) {
+            parts.unshift(folder.name)
+            currentId = folder.parent_id
+          } else {
+            break
+          }
+        }
+        return parts.join(" / ")
+      }
+
+      // Calculate folder depth
+      function getFolderDepth(folderId: string): number {
+        let depth = 0
+        let currentId: string | null = folderId
+        while (currentId) {
+          const folder = fMap.get(currentId)
+          if (folder?.parent_id) {
+            depth++
+            currentId = folder.parent_id
+          } else {
+            break
+          }
+        }
+        return depth
+      }
+
+      // Build sorted folder options (by path for hierarchical display)
+      const folderOptions: FolderOption[] = (foldersData || [])
+        .map(f => ({
+          id: f.id,
+          name: f.name,
+          path: getFolderPath(f.id),
+          depth: getFolderDepth(f.id)
+        }))
+        .sort((a, b) => a.path.localeCompare(b.path))
+
+      setFolders(folderOptions)
+      setAllFiles(files || [])
+
+      // Load all student progress
+      const { data: progressRecords } = await supabase
+        .from("student_progress")
+        .select("student_id, file_id")
+        .eq("status", "completed")
+
+      setAllProgress(progressRecords || [])
+
+      // Calculate progress for all files (no folder filter initially)
+      const totalFiles = files?.length || 0
       const progressData: StudentProgressReport[] = []
       for (const student of students || []) {
-        const { count: completedCount } = await supabase
-          .from("student_progress")
-          .select("*", { count: "exact", head: true })
-          .eq("student_id", student.id)
-          .eq("status", "completed")
+        const completedCount = (progressRecords || []).filter(
+          p => p.student_id === student.id
+        ).length
 
         progressData.push({
           student,
-          completedLessons: completedCount || 0,
-          totalLessons: totalFiles || 0,
-          progressPercentage: totalFiles ? Math.round(((completedCount || 0) / totalFiles) * 100) : 0,
+          completedLessons: completedCount,
+          totalLessons: totalFiles,
+          progressPercentage: totalFiles ? Math.round((completedCount / totalFiles) * 100) : 0,
         })
       }
 
@@ -258,7 +338,53 @@ export default function AdminReportsPage() {
     setLoadingDetails(false)
   }
 
-  const filteredProgress = progressReports.filter(
+  // Helper function to get all descendant folder IDs
+  function getDescendantFolderIds(folderId: string): string[] {
+    const descendants: string[] = [folderId]
+    const queue = [folderId]
+    while (queue.length > 0) {
+      const currentId = queue.shift()!
+      folderMap.forEach((folder, id) => {
+        if (folder.parent_id === currentId && !descendants.includes(id)) {
+          descendants.push(id)
+          queue.push(id)
+        }
+      })
+    }
+    return descendants
+  }
+
+  // Calculate filtered progress based on folder selection
+  const filteredProgressByFolder = progressReports.map(report => {
+    if (selectedFolderId === "all") {
+      return report
+    }
+
+    // Get all folder IDs that should be included (selected folder + descendants)
+    const includedFolderIds = getDescendantFolderIds(selectedFolderId)
+
+    // Filter files to only those in the selected folder hierarchy
+    const filteredFiles = allFiles.filter(f => 
+      f.folder_id && includedFolderIds.includes(f.folder_id)
+    )
+    const filteredFileIds = new Set(filteredFiles.map(f => f.id))
+
+    // Count completed files in the filtered set
+    const completedInFolder = allProgress.filter(
+      p => p.student_id === report.student.id && filteredFileIds.has(p.file_id)
+    ).length
+
+    const totalInFolder = filteredFiles.length
+
+    return {
+      ...report,
+      completedLessons: completedInFolder,
+      totalLessons: totalInFolder,
+      progressPercentage: totalInFolder ? Math.round((completedInFolder / totalInFolder) * 100) : 0,
+    }
+  })
+
+  const filteredProgress = filteredProgressByFolder.filter(
     (r) =>
       r.student.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.student.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -342,7 +468,7 @@ export default function AdminReportsPage() {
         </Card>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-wrap">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -351,6 +477,24 @@ export default function AdminReportsPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-9"
           />
+        </div>
+        <div className="flex items-center gap-2">
+          <FolderOpen className="h-4 w-4 text-muted-foreground" />
+          <Select value={selectedFolderId} onValueChange={setSelectedFolderId}>
+            <SelectTrigger className="w-[250px]">
+              <SelectValue placeholder="Filter by folder..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Folders</SelectItem>
+              {folders.map((folder) => (
+                <SelectItem key={folder.id} value={folder.id}>
+                  <span style={{ paddingLeft: `${folder.depth * 12}px` }}>
+                    {folder.depth > 0 ? "└ " : ""}{folder.name}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
