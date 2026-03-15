@@ -112,7 +112,7 @@ export default function AdminReportsPage() {
       const examMap = new Map(exams?.map(e => [e.id, e]) || [])
 
       // Build exam attempts with details
-      const attemptsWithDetails: ExamAttemptWithDetails[] = (attempts || []).map(attempt => {
+      const allAttempts: ExamAttemptWithDetails[] = (attempts || []).map(attempt => {
         const profile = profileMap.get(attempt.student_id)
         const exam = examMap.get(attempt.exam_id)
         return {
@@ -130,8 +130,22 @@ export default function AdminReportsPage() {
         }
       })
 
+      // Group by student_id + exam_id and keep only the highest score
+      const highestScoreMap = new Map<string, ExamAttemptWithDetails>()
+      allAttempts.forEach(attempt => {
+        const key = `${attempt.student_id}-${attempt.exam_id}`
+        const existing = highestScoreMap.get(key)
+        if (!existing || attempt.score > existing.score) {
+          highestScoreMap.set(key, attempt)
+        }
+      })
+
+      // Convert map to array and sort by date
+      const highestScoreAttempts = Array.from(highestScoreMap.values())
+        .sort((a, b) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime())
+
       setProgressReports(progressData)
-      setExamAttempts(attemptsWithDetails)
+      setExamAttempts(highestScoreAttempts)
     } catch (error) {
       console.error("Error loading reports:", error)
     } finally {
@@ -330,7 +344,7 @@ export default function AdminReportsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Exam Results</CardTitle>
-              <CardDescription>View all exam attempts and scores</CardDescription>
+              <CardDescription>Showing highest score per student for each exam</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
