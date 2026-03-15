@@ -3,6 +3,7 @@
 import { VideoPlayer } from "./video-player";
 import { PDFViewer } from "./pdf-viewer";
 import { PowerPointViewer } from "./powerpoint-viewer";
+import { ExternalVideoPlayer } from "./external-video-player";
 import type { FileItem } from "@/lib/types";
 
 interface FileViewerProps {
@@ -38,6 +39,9 @@ export function FileViewer({ file, showProgress, onMarkComplete, isCompleted, ca
         {file.type === "video" && <VideoPlayer url={file.file_url} canDownload={canDownload} />}
         {file.type === "pdf" && <PDFViewer url={file.file_url} canDownload={canDownload} />}
         {file.type === "powerpoint" && <PowerPointViewer url={file.file_url} fileName={file.name} canDownload={canDownload} />}
+        {file.type === "external_video" && file.external_url && (
+          <ExternalVideoPlayer url={file.external_url} title={file.name} />
+        )}
       </div>
     </div>
   );

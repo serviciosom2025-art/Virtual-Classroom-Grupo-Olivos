@@ -25,13 +25,15 @@ export interface Folder {
 export interface FileItem {
   id: string;
   name: string;
-  type: "video" | "pdf" | "powerpoint";
+  type: "video" | "pdf" | "powerpoint" | "external_video";
   file_url: string;
   folder_id: string;
   uploaded_by: string;
   file_size: number | null;
   created_at: string;
   updated_at: string;
+  external_url?: string | null;
+  is_external?: boolean;
 }
 
 export interface StudentProgress {

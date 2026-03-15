@@ -24,6 +24,7 @@ import {
   Trash2,
   Edit2,
   MoreHorizontal,
+  Link2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -53,6 +54,7 @@ export default function FoldersPage() {
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
   const [uploadFileOpen, setUploadFileOpen] = useState(false);
   const [editFolderOpen, setEditFolderOpen] = useState(false);
+  const [externalLinkOpen, setExternalLinkOpen] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
 
   // Form states
@@ -60,6 +62,10 @@ export default function FoldersPage() {
   const [editFolderName, setEditFolderName] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadFileType, setUploadFileType] = useState<string>("video");
+  
+  // External link states
+  const [externalLinkName, setExternalLinkName] = useState("");
+  const [externalLinkUrl, setExternalLinkUrl] = useState("");
 
   const supabase = createClient();
 
@@ -187,6 +193,45 @@ export default function FoldersPage() {
     setFormLoading(false);
   };
 
+  const handleAddExternalLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!externalLinkName.trim() || !externalLinkUrl.trim() || !selectedFolderId || !user) return;
+
+    // Validate URL is from Google Drive or OneDrive
+    const isGoogleDrive = externalLinkUrl.includes("drive.google.com");
+    const isOneDrive = externalLinkUrl.includes("onedrive.live.com") || 
+                       externalLinkUrl.includes("1drv.ms") || 
+                       externalLinkUrl.includes("sharepoint.com");
+
+    if (!isGoogleDrive && !isOneDrive) {
+      alert("Please enter a valid Google Drive or OneDrive link");
+      return;
+    }
+
+    setFormLoading(true);
+
+    const { error } = await supabase.from("files").insert({
+      name: externalLinkName,
+      type: "external_video",
+      file_url: "",
+      external_url: externalLinkUrl,
+      is_external: true,
+      folder_id: selectedFolderId,
+      uploaded_by: user.id,
+      file_size: 0,
+    });
+
+    if (!error) {
+      setExternalLinkName("");
+      setExternalLinkUrl("");
+      setExternalLinkOpen(false);
+      fetchData();
+    } else {
+      alert("Failed to add external link: " + error.message);
+    }
+    setFormLoading(false);
+  };
+
   const handleDeleteFile = async (fileId: string) => {
     if (!confirm("Are you sure you want to delete this file?")) return;
 
@@ -287,6 +332,62 @@ export default function FoldersPage() {
               <div className="flex items-center gap-2">
                 {selectedFolderId && (
                   <>
+                    <Dialog open={externalLinkOpen} onOpenChange={setExternalLinkOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" variant="outline">
+                          <Link2 className="w-4 h-4 mr-2" />
+                          Add Video Link
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Add External Video Link</DialogTitle>
+                          <DialogDescription>
+                            Add a video from Google Drive or OneDrive to: {selectedFolderData?.name}
+                          </DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={handleAddExternalLink} className="space-y-4 mt-4">
+                          <Field>
+                            <FieldLabel>Video Name</FieldLabel>
+                            <Input
+                              value={externalLinkName}
+                              onChange={(e) => setExternalLinkName(e.target.value)}
+                              placeholder="Enter a name for this video"
+                              required
+                            />
+                          </Field>
+                          <Field>
+                            <FieldLabel>Video Link</FieldLabel>
+                            <Input
+                              value={externalLinkUrl}
+                              onChange={(e) => setExternalLinkUrl(e.target.value)}
+                              placeholder="Paste Google Drive or OneDrive link"
+                              required
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Supported: Google Drive sharing links, OneDrive/SharePoint links
+                            </p>
+                          </Field>
+                          <div className="bg-muted/50 p-3 rounded-lg">
+                            <p className="text-sm font-medium mb-2">How to get the link:</p>
+                            <ul className="text-xs text-muted-foreground space-y-1">
+                              <li><strong>Google Drive:</strong> Right-click → Share → Copy link</li>
+                              <li><strong>OneDrive:</strong> Right-click → Share → Copy link</li>
+                            </ul>
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <Button type="button" variant="outline" onClick={() => setExternalLinkOpen(false)}>
+                              Cancel
+                            </Button>
+                            <Button type="submit" disabled={formLoading} className="bg-blue-600 hover:bg-blue-700">
+                              {formLoading && <Spinner className="w-4 h-4 mr-2" />}
+                              Add Video Link
+                            </Button>
+                          </div>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+
                     <Dialog open={uploadFileOpen} onOpenChange={setUploadFileOpen}>
                       <DialogTrigger asChild>
                         <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
