@@ -82,6 +82,7 @@ export default function TeacherExamEditPage({ params }: { params: Promise<{ exam
         folder_id: exam.folder_id,
         max_attempts: exam.max_attempts,
         questions_count: exam.questions_count,
+        time_limit: exam.time_limit,
         randomize_questions: exam.randomize_questions,
         randomize_answers: exam.randomize_answers,
         updated_at: new Date().toISOString(),
@@ -244,6 +245,17 @@ export default function TeacherExamEditPage({ params }: { params: Promise<{ exam
                 value={exam.questions_count}
                 onChange={(e) => setExam({ ...exam, questions_count: parseInt(e.target.value) || 1 })}
               />
+            </Field>
+            <Field>
+              <FieldLabel>Time Limit (minutes)</FieldLabel>
+              <Input
+                type="number"
+                min="5"
+                max="180"
+                value={exam.time_limit || 30}
+                onChange={(e) => setExam({ ...exam, time_limit: parseInt(e.target.value) || 30 })}
+              />
+              <p className="text-xs text-muted-foreground mt-1">5-180 minutes</p>
             </Field>
           </div>
         </CardContent>
