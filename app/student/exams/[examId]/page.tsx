@@ -95,6 +95,10 @@ export default function ExamTakingPage() {
         processedQuestions = shuffleArray(processedQuestions);
       }
 
+      // Limit questions to the configured questions_count
+      const questionsToShow = examRes.data.questions_count || processedQuestions.length;
+      processedQuestions = processedQuestions.slice(0, questionsToShow);
+
       // Shuffle answer options if enabled
       const shuffledQuestions: ShuffledQuestion[] = processedQuestions.map((q) => {
         // Normalize option values to handle special characters (Spanish accents, etc.)
