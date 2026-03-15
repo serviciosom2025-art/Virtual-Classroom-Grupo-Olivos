@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
-import { Play, Pause, Volume2, VolumeX, Maximize, SkipBack, SkipForward, AlertCircle } from "lucide-react";
+import { useRef, useState, useEffect, useCallback } from "react";
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward, AlertCircle } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,23 @@ export function VideoPlayer({ url, canDownload = true }: VideoPlayerProps) {
   const [showControls, setShowControls] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Handle fullscreen change events
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+    };
+  }, []);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -98,16 +115,25 @@ export function VideoPlayer({ url, canDownload = true }: VideoPlayerProps) {
     setIsMuted(!isMuted);
   };
 
-  const toggleFullscreen = () => {
+  const toggleFullscreen = useCallback(async () => {
     const container = containerRef.current;
     if (!container) return;
 
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
-    } else {
-      container.requestFullscreen();
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        // Use container fullscreen to keep custom controls (prevents native download option)
+        if (container.requestFullscreen) {
+          await container.requestFullscreen();
+        } else if ((container as any).webkitRequestFullscreen) {
+          await (container as any).webkitRequestFullscreen();
+        }
+      }
+    } catch (err) {
+      console.error("Fullscreen error:", err);
     }
-  };
+  }, []);
 
   const skip = (seconds: number) => {
     const video = videoRef.current;
@@ -124,7 +150,25 @@ export function VideoPlayer({ url, canDownload = true }: VideoPlayerProps) {
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
+    return false;
   };
+
+  // Auto-hide controls on mobile after interaction
+  const showControlsTemporarily = useCallback(() => {
+    setShowControls(true);
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    if (isPlaying) {
+      controlsTimeoutRef.current = setTimeout(() => {
+        setShowControls(false);
+      }, 3000);
+    }
+  }, [isPlaying]);
+
+  const handleTouchStart = useCallback(() => {
+    showControlsTemporarily();
+  }, [showControlsTemporarily]);
 
   if (error) {
     return (
@@ -145,20 +189,31 @@ export function VideoPlayer({ url, canDownload = true }: VideoPlayerProps) {
   return (
     <div
       ref={containerRef}
-      className="relative h-full bg-black flex items-center justify-center group"
+      className={`relative h-full bg-black flex items-center justify-center group ${isFullscreen ? 'fullscreen-container' : ''}`}
       onMouseEnter={() => setShowControls(true)}
       onMouseLeave={() => setShowControls(isPlaying ? false : true)}
+      onTouchStart={handleTouchStart}
+      onContextMenu={handleContextMenu}
     >
+      {/* Prevent download overlay - blocks long-press on mobile */}
+      {!canDownload && (
+        <div 
+          className="absolute inset-0 z-10" 
+          onContextMenu={handleContextMenu}
+          style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' }}
+        />
+      )}
       <video
         ref={videoRef}
         src={url}
-        className="max-h-full max-w-full"
+        className="max-h-full max-w-full pointer-events-none"
         onContextMenu={handleContextMenu}
         controlsList="nodownload nofullscreen noremoteplayback"
         disablePictureInPicture
-        onClick={togglePlay}
         playsInline
         preload="metadata"
+        controls={false}
+        style={{ WebkitTouchCallout: 'none' }}
       />
 
       {/* Loading Overlay */}
@@ -170,8 +225,8 @@ export function VideoPlayer({ url, canDownload = true }: VideoPlayerProps) {
 
       {/* Controls Overlay */}
       <div
-        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 transition-opacity ${
-          showControls ? "opacity-100" : "opacity-0"
+        className={`absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black/80 to-transparent p-4 transition-opacity ${
+          showControls ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
         {/* Progress Bar */}
@@ -216,23 +271,26 @@ export function VideoPlayer({ url, canDownload = true }: VideoPlayerProps) {
               />
             </div>
             <button onClick={toggleFullscreen} className="text-white/80 hover:text-white transition-colors">
-              <Maximize className="w-5 h-5" />
+              {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Play Button Overlay */}
-      {!isPlaying && !isLoading && (
-        <button
-          onClick={togglePlay}
-          className="absolute inset-0 flex items-center justify-center bg-black/20"
-        >
+      {/* Clickable area for play/pause */}
+      <button
+        onClick={togglePlay}
+        onTouchEnd={(e) => { e.preventDefault(); togglePlay(); showControlsTemporarily(); }}
+        className="absolute inset-0 z-20 flex items-center justify-center"
+        style={{ WebkitTapHighlightColor: 'transparent' }}
+      >
+        {/* Play Button Overlay - only visible when paused */}
+        {!isPlaying && !isLoading && (
           <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
             <Play className="w-10 h-10 text-white ml-1" />
           </div>
-        </button>
-      )}
+        )}
+      </button>
     </div>
   );
 }
