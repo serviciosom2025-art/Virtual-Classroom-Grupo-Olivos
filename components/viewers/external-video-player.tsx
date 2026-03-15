@@ -107,7 +107,7 @@ export function ExternalVideoPlayer({ url, title }: ExternalVideoPlayerProps) {
   }
 
   return (
-    <div className="relative w-full h-full bg-black">
+    <div className="relative w-full h-full bg-black overflow-hidden">
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
           <div className="flex flex-col items-center gap-3">
@@ -128,6 +128,11 @@ export function ExternalVideoPlayer({ url, title }: ExternalVideoPlayerProps) {
           border: "none",
         }}
         sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
+      />
+      {/* Cover overlay to hide SharePoint/OneDrive pop-up button in top-right corner */}
+      <div 
+        className="absolute top-0 right-0 w-20 h-16 bg-black z-30"
+        style={{ pointerEvents: "none" }}
       />
       {/* Overlay to prevent right-click and interactions that could reveal URL */}
       <div 
