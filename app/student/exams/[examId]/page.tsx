@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth-context";
+import { useExamLock } from "@/lib/exam-lock-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +43,7 @@ export default function ExamTakingPage() {
   const router = useRouter();
   const examId = params.examId as string;
   const { user } = useAuth();
+  const { setExamInProgress } = useExamLock();
 
   const [exam, setExam] = useState<Exam | null>(null);
   const [questions, setQuestions] = useState<ShuffledQuestion[]>([]);
@@ -143,6 +145,13 @@ export default function ExamTakingPage() {
     fetchData();
   }, [fetchData]);
 
+  // Cleanup exam lock on unmount
+  useEffect(() => {
+    return () => {
+      setExamInProgress(false);
+    };
+  }, [setExamInProgress]);
+
   // Timer effect
   useEffect(() => {
     if (examState !== "taking" || timeLeft === null || timeLeft <= 0) return;
@@ -213,6 +222,10 @@ export default function ExamTakingPage() {
     if (exam.time_limit) {
       setTimeLeft(exam.time_limit * 60);
     }
+    
+    // Lock navigation while taking exam
+    setExamInProgress(true, exam.title);
+    
     setExamState("taking");
     setAnswers({});
     setCurrentQuestionIndex(0);
@@ -290,6 +303,9 @@ export default function ExamTakingPage() {
     setResult({ score, total: totalQuestions });
     setExamState("result");
     setSubmitting(false);
+    
+    // Unlock navigation when exam is complete
+    setExamInProgress(false);
   };
 
   if (loading) {
