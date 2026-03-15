@@ -160,8 +160,57 @@ export default function ExamTakingPage() {
     return () => clearInterval(timer);
   }, [examState, timeLeft]);
 
-  const startExam = () => {
-    if (exam?.time_limit) {
+  const startExam = async () => {
+    if (!exam || !user) return;
+    
+    // Re-fetch and re-shuffle questions for each new attempt
+    const { data: questionsData } = await supabase
+      .from("questions")
+      .select("*")
+      .eq("exam_id", examId);
+
+    let processedQuestions = questionsData || [];
+
+    // Always shuffle questions first to get random selection from the bank
+    processedQuestions = shuffleArray(processedQuestions);
+
+    // Limit questions to the configured questions_count
+    const questionsToShow = exam.questions_count || processedQuestions.length;
+    processedQuestions = processedQuestions.slice(0, questionsToShow);
+
+    // If randomize_questions is disabled, sort by created_at for consistent order
+    if (!exam.randomize_questions) {
+      processedQuestions = processedQuestions.sort((a, b) => 
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+    }
+
+    // Shuffle answer options if enabled
+    const shuffledQuestions: ShuffledQuestion[] = processedQuestions.map((q) => {
+      const allOptions = [
+        { key: "A", value: q.option_a },
+        { key: "B", value: q.option_b },
+        { key: "C", value: q.option_c },
+        { key: "D", value: q.option_d },
+      ];
+      
+      let options = allOptions
+        .filter(opt => opt.value != null && opt.value !== "")
+        .map(opt => ({
+          key: opt.key,
+          value: String(opt.value).normalize("NFC")
+        }));
+
+      if (exam.randomize_answers && options.length > 0) {
+        options = shuffleArray(options);
+      }
+
+      return { ...q, shuffledOptions: options };
+    });
+
+    setQuestions(shuffledQuestions);
+    
+    if (exam.time_limit) {
       setTimeLeft(exam.time_limit * 60);
     }
     setExamState("taking");
