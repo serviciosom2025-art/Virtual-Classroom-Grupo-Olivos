@@ -98,14 +98,23 @@ export default function ExamTakingPage() {
       // Shuffle answer options if enabled
       const shuffledQuestions: ShuffledQuestion[] = processedQuestions.map((q) => {
         // Normalize option values to handle special characters (Spanish accents, etc.)
-        let options = [
-          { key: "A", value: (q.option_a || "").normalize("NFC") },
-          { key: "B", value: (q.option_b || "").normalize("NFC") },
-          { key: "C", value: (q.option_c || "").normalize("NFC") },
-          { key: "D", value: (q.option_d || "").normalize("NFC") },
-        ].filter(opt => opt.value); // Filter out empty options
+        // Only include options that have actual values
+        const allOptions = [
+          { key: "A", value: q.option_a },
+          { key: "B", value: q.option_b },
+          { key: "C", value: q.option_c },
+          { key: "D", value: q.option_d },
+        ];
+        
+        // Filter out null/undefined/empty options first, then normalize
+        let options = allOptions
+          .filter(opt => opt.value != null && opt.value !== "")
+          .map(opt => ({
+            key: opt.key,
+            value: String(opt.value).normalize("NFC")
+          }));
 
-        if (examRes.data.randomize_answers) {
+        if (examRes.data.randomize_answers && options.length > 0) {
           options = shuffleArray(options);
         }
 
@@ -370,8 +379,8 @@ export default function ExamTakingPage() {
   const answeredCount = Object.keys(answers).length;
   const progressPercent = questions.length > 0 ? (answeredCount / questions.length) * 100 : 0;
 
-  // Safety check - if no questions or invalid index, show loading
-  if (!currentQuestion || !currentQuestion.shuffledOptions) {
+  // Safety check - if no questions or invalid index or no options, show loading
+  if (!currentQuestion || !currentQuestion.shuffledOptions || currentQuestion.shuffledOptions.length === 0) {
     return (
       <div className="flex justify-center py-20">
         <Spinner className="w-8 h-8 text-blue-600" />
@@ -419,9 +428,11 @@ export default function ExamTakingPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           {currentQuestion.shuffledOptions.map((option, index) => {
-            const normalizedAnswer = answers[currentQuestion.id]?.normalize("NFC") || "";
-            const normalizedValue = option.value?.normalize("NFC") || "";
-            const isSelected = normalizedAnswer === normalizedValue;
+            if (!option || option.value == null) return null;
+            const answerValue = answers[currentQuestion.id];
+            const normalizedAnswer = answerValue ? String(answerValue).normalize("NFC") : "";
+            const normalizedValue = String(option.value).normalize("NFC");
+            const isSelected = normalizedAnswer !== "" && normalizedAnswer === normalizedValue;
             return (
               <button
                 key={index}
