@@ -8,9 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { ChevronDown, ChevronRight, Search, Users, BookOpen, Award, TrendingUp } from "lucide-react"
-import type { Profile, ExamAttempt } from "@/lib/types"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Search, Users, BookOpen, Award, TrendingUp, Eye, CheckCircle, XCircle } from "lucide-react"
+import type { Profile } from "@/lib/types"
 
 interface StudentProgressReport {
   student: Profile
@@ -19,23 +19,40 @@ interface StudentProgressReport {
   progressPercentage: number
 }
 
-interface ExamResultReport {
-  student: Profile
-  examTitle: string
-  folderName: string
-  highestScore: number
-  totalQuestions: number
-  attemptsUsed: number
-  completedAt: string
-  attempts: ExamAttempt[]
+interface ExamAttemptWithDetails {
+  id: string
+  student_id: string
+  exam_id: string
+  score: number
+  total_questions: number
+  attempt_number: number
+  completed_at: string
+  answers: Record<string, string>
+  student_name: string
+  student_email: string
+  exam_title: string
+}
+
+interface QuestionDetail {
+  id: string
+  question: string
+  option_a: string
+  option_b: string
+  option_c: string
+  option_d: string
+  correct_answer: string
+  student_answer: string
+  is_correct: boolean
 }
 
 export default function AdminReportsPage() {
   const [progressReports, setProgressReports] = useState<StudentProgressReport[]>([])
-  const [examReports, setExamReports] = useState<ExamResultReport[]>([])
+  const [examAttempts, setExamAttempts] = useState<ExamAttemptWithDetails[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [expandedStudents, setExpandedStudents] = useState<Set<string>>(new Set())
+  const [selectedAttempt, setSelectedAttempt] = useState<ExamAttemptWithDetails | null>(null)
+  const [questionDetails, setQuestionDetails] = useState<QuestionDetail[]>([])
+  const [loadingDetails, setLoadingDetails] = useState(false)
 
   useEffect(() => {
     loadReports()
@@ -44,109 +61,122 @@ export default function AdminReportsPage() {
   async function loadReports() {
     const supabase = createClient()
 
-    // Load all students
-    const { data: students } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("role", "student")
-      .order("full_name")
+    try {
+      // Load all students
+      const { data: students } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("role", "student")
+        .order("full_name")
 
-    // Load total files count
-    const { count: totalFiles } = await supabase
-      .from("files")
-      .select("*", { count: "exact", head: true })
-
-    // Load progress for each student
-    const progressData: StudentProgressReport[] = []
-    for (const student of students || []) {
-      const { count: completedCount } = await supabase
-        .from("student_progress")
+      // Load total files count
+      const { count: totalFiles } = await supabase
+        .from("files")
         .select("*", { count: "exact", head: true })
-        .eq("student_id", student.id)
-        .eq("status", "completed")
 
-      progressData.push({
-        student,
-        completedLessons: completedCount || 0,
-        totalLessons: totalFiles || 0,
-        progressPercentage: totalFiles ? Math.round(((completedCount || 0) / totalFiles) * 100) : 0,
-      })
-    }
+      // Load progress for each student
+      const progressData: StudentProgressReport[] = []
+      for (const student of students || []) {
+        const { count: completedCount } = await supabase
+          .from("student_progress")
+          .select("*", { count: "exact", head: true })
+          .eq("student_id", student.id)
+          .eq("status", "completed")
 
-    // Load exam attempts directly (this is where exam data is stored)
-    const { data: examAttempts } = await supabase
-      .from("exam_attempts")
-      .select(`
-        *,
-        student:profiles!exam_attempts_student_id_fkey(*),
-        exam:exams(
-          title,
-          folder:folders(name)
-        )
-      `)
-      .order("completed_at", { ascending: false })
-
-    // Group attempts by student and exam to create reports
-    const examData: ExamResultReport[] = []
-    const groupedAttempts = new Map<string, {
-      student: Profile
-      exam: any
-      attempts: ExamAttempt[]
-      highestScore: number
-      totalQuestions: number
-      completedAt: string
-    }>()
-
-    for (const attempt of examAttempts || []) {
-      const key = `${attempt.student_id}-${attempt.exam_id}`
-      
-      if (!groupedAttempts.has(key)) {
-        groupedAttempts.set(key, {
-          student: attempt.student,
-          exam: attempt.exam,
-          attempts: [],
-          highestScore: attempt.highest_score || attempt.score || 0,
-          totalQuestions: attempt.total_questions || 0,
-          completedAt: attempt.completed_at,
+        progressData.push({
+          student,
+          completedLessons: completedCount || 0,
+          totalLessons: totalFiles || 0,
+          progressPercentage: totalFiles ? Math.round(((completedCount || 0) / totalFiles) * 100) : 0,
         })
       }
-      
-      const group = groupedAttempts.get(key)!
-      group.attempts.push(attempt)
-      
-      // Track highest score
-      const score = attempt.score || attempt.highest_score || 0
-      if (score > group.highestScore) {
-        group.highestScore = score
-      }
-    }
 
-    for (const [key, group] of groupedAttempts) {
-      examData.push({
-        student: group.student,
-        examTitle: group.exam?.title || "Unknown Exam",
-        folderName: group.exam?.folder?.name || "General",
-        highestScore: group.highestScore,
-        totalQuestions: group.totalQuestions,
-        attemptsUsed: group.attempts.length,
-        completedAt: group.completedAt,
-        attempts: group.attempts,
+      // Load exam attempts with separate queries for better reliability
+      const { data: attempts } = await supabase
+        .from("exam_attempts")
+        .select("*")
+        .order("completed_at", { ascending: false })
+
+      // Load profiles and exams to join manually
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .eq("role", "student")
+
+      const { data: exams } = await supabase
+        .from("exams")
+        .select("id, title")
+
+      // Create lookup maps
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || [])
+      const examMap = new Map(exams?.map(e => [e.id, e]) || [])
+
+      // Build exam attempts with details
+      const attemptsWithDetails: ExamAttemptWithDetails[] = (attempts || []).map(attempt => {
+        const profile = profileMap.get(attempt.student_id)
+        const exam = examMap.get(attempt.exam_id)
+        return {
+          id: attempt.id,
+          student_id: attempt.student_id,
+          exam_id: attempt.exam_id,
+          score: attempt.score,
+          total_questions: attempt.total_questions,
+          attempt_number: attempt.attempt_number,
+          completed_at: attempt.completed_at,
+          answers: attempt.answers || {},
+          student_name: profile?.full_name || "Unknown",
+          student_email: profile?.email || "",
+          exam_title: exam?.title || "Unknown Exam",
+        }
       })
-    }
 
-    setProgressReports(progressData)
-    setExamReports(examData)
-    setLoading(false)
+      setProgressReports(progressData)
+      setExamAttempts(attemptsWithDetails)
+    } catch (error) {
+      console.error("Error loading reports:", error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const toggleExpanded = (studentId: string) => {
-    const newExpanded = new Set(expandedStudents)
-    if (newExpanded.has(studentId)) {
-      newExpanded.delete(studentId)
-    } else {
-      newExpanded.add(studentId)
-    }
-    setExpandedStudents(newExpanded)
+  async function viewAttemptDetails(attempt: ExamAttemptWithDetails) {
+    setSelectedAttempt(attempt)
+    setLoadingDetails(true)
+
+    const supabase = createClient()
+    
+    // Load questions for this exam
+    const { data: questions } = await supabase
+      .from("questions")
+      .select("*")
+      .eq("exam_id", attempt.exam_id)
+      .order("created_at")
+
+    // Map questions with student answers
+    const details: QuestionDetail[] = (questions || []).map(q => {
+      const studentAnswer = attempt.answers[q.id] || ""
+      // Determine which option the student selected
+      let selectedOption = ""
+      if (studentAnswer === q.option_a) selectedOption = "A"
+      else if (studentAnswer === q.option_b) selectedOption = "B"
+      else if (studentAnswer === q.option_c) selectedOption = "C"
+      else if (studentAnswer === q.option_d) selectedOption = "D"
+      
+      return {
+        id: q.id,
+        question: q.question,
+        option_a: q.option_a,
+        option_b: q.option_b,
+        option_c: q.option_c,
+        option_d: q.option_d,
+        correct_answer: q.correct_answer,
+        student_answer: selectedOption,
+        is_correct: selectedOption === q.correct_answer,
+      }
+    })
+
+    setQuestionDetails(details)
+    setLoadingDetails(false)
   }
 
   const filteredProgress = progressReports.filter(
@@ -155,11 +185,11 @@ export default function AdminReportsPage() {
       r.student.email.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const filteredExams = examReports.filter(
+  const filteredExams = examAttempts.filter(
     (r) =>
-      r.student.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.examTitle.toLowerCase().includes(searchTerm.toLowerCase())
+      r.student_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.student_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.exam_title.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   // Summary statistics
@@ -167,11 +197,11 @@ export default function AdminReportsPage() {
   const averageProgress = progressReports.length > 0
     ? Math.round(progressReports.reduce((acc, r) => acc + r.progressPercentage, 0) / progressReports.length)
     : 0
-  const totalExamsTaken = examReports.length
-  const averageExamScore = examReports.length > 0
+  const totalExamsTaken = examAttempts.length
+  const averageExamScore = examAttempts.length > 0
     ? Math.round(
-        examReports.reduce((acc, r) => acc + (r.highestScore / r.totalQuestions) * 100, 0) /
-        examReports.length
+        examAttempts.reduce((acc, r) => acc + (r.score / r.total_questions) * 100, 0) /
+        examAttempts.length
       )
     : 0
 
@@ -303,92 +333,133 @@ export default function AdminReportsPage() {
               <CardDescription>View all exam attempts and scores</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {filteredExams.map((report, index) => (
-                  <Collapsible
-                    key={`${report.student.id}-${report.examTitle}-${index}`}
-                    open={expandedStudents.has(`${report.student.id}-${index}`)}
-                    onOpenChange={() => toggleExpanded(`${report.student.id}-${index}`)}
-                  >
-                    <div className="border rounded-lg">
-                      <CollapsibleTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-between p-4 h-auto"
-                        >
-                          <div className="flex items-center gap-4 text-left">
-                            {expandedStudents.has(`${report.student.id}-${index}`) ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
-                            <div>
-                              <p className="font-medium">
-                                {report.student.full_name || "Unnamed"}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {report.examTitle} - {report.folderName}
-                              </p>
-                            </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Student</TableHead>
+                    <TableHead>Exam</TableHead>
+                    <TableHead>Score</TableHead>
+                    <TableHead>Grade</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredExams.map((attempt) => {
+                    const percentage = Math.round((attempt.score / attempt.total_questions) * 100)
+                    return (
+                      <TableRow key={attempt.id}>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{attempt.student_name}</p>
+                            <p className="text-sm text-muted-foreground">{attempt.student_email}</p>
                           </div>
-                          <div className="flex items-center gap-4">
-                            <Badge variant="outline">
-                              {report.attemptsUsed} attempt{report.attemptsUsed !== 1 ? "s" : ""}
-                            </Badge>
-                            <div className="text-right">
-                              <p className="font-bold">
-                                {report.highestScore}/{report.totalQuestions}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                Highest Score
-                              </p>
-                            </div>
-                          </div>
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <div className="p-4 pt-0 border-t">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Attempt</TableHead>
-                                <TableHead>Score</TableHead>
-                                <TableHead>Percentage</TableHead>
-                                <TableHead>Date</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {report.attempts.map((attempt) => (
-                                <TableRow key={attempt.id}>
-                                  <TableCell>Attempt {attempt.attempt_number}</TableCell>
-                                  <TableCell>
-                                    {attempt.score}/{attempt.total_questions}
-                                  </TableCell>
-                                  <TableCell>
-                                    {Math.round((attempt.score / attempt.total_questions) * 100)}%
-                                  </TableCell>
-                                  <TableCell>
-                                    {new Date(attempt.completed_at).toLocaleString()}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      </CollapsibleContent>
-                    </div>
-                  </Collapsible>
-                ))}
-                {filteredExams.length === 0 && (
-                  <p className="text-center text-muted-foreground py-8">
-                    No exam results found
-                  </p>
-                )}
-              </div>
+                        </TableCell>
+                        <TableCell className="font-medium">{attempt.exam_title}</TableCell>
+                        <TableCell>{attempt.score}/{attempt.total_questions}</TableCell>
+                        <TableCell>
+                          <Badge variant={percentage >= 70 ? "default" : percentage >= 50 ? "secondary" : "destructive"}>
+                            {percentage}%
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {new Date(attempt.completed_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => viewAttemptDetails(attempt)}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+              {filteredExams.length === 0 && (
+                <p className="text-center text-muted-foreground py-8">
+                  No exam results found
+                </p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Exam Details Dialog */}
+      <Dialog open={!!selectedAttempt} onOpenChange={() => setSelectedAttempt(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Exam Results: {selectedAttempt?.exam_title}
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Student: {selectedAttempt?.student_name} | Score: {selectedAttempt?.score}/{selectedAttempt?.total_questions} ({selectedAttempt ? Math.round((selectedAttempt.score / selectedAttempt.total_questions) * 100) : 0}%)
+            </p>
+          </DialogHeader>
+
+          {loadingDetails ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            <div className="space-y-4 mt-4">
+              {questionDetails.map((q, index) => (
+                <div
+                  key={q.id}
+                  className={`p-4 rounded-lg border ${
+                    q.is_correct ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    {q.is_correct ? (
+                      <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+                    )}
+                    <div className="flex-1">
+                      <p className="font-medium mb-2">
+                        {index + 1}. {q.question}
+                      </p>
+                      <div className="grid gap-1 text-sm">
+                        {[
+                          { key: "A", value: q.option_a },
+                          { key: "B", value: q.option_b },
+                          { key: "C", value: q.option_c },
+                          { key: "D", value: q.option_d },
+                        ].filter(opt => opt.value).map((opt) => {
+                          const isCorrect = opt.key === q.correct_answer
+                          const isStudentAnswer = opt.key === q.student_answer
+                          return (
+                            <div
+                              key={opt.key}
+                              className={`p-2 rounded ${
+                                isCorrect
+                                  ? "bg-green-100 text-green-800 font-medium"
+                                  : isStudentAnswer && !isCorrect
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-white"
+                              }`}
+                            >
+                              <span className="font-semibold">{opt.key}.</span> {opt.value}
+                              {isCorrect && " (Correct)"}
+                              {isStudentAnswer && !isCorrect && " (Student's answer)"}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
