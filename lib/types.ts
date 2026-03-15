@@ -101,6 +101,7 @@ export interface ExamResult {
 export interface PlatformSettings {
   id: string;
   platform_name: string;
+  login_title: string;
   logo_url: string | null;
   sidebar_color: string;
   primary_color: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,22 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [loginTitle, setLoginTitle] = useState("Virtual Classroom LMS");
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("platform_settings")
+        .select("login_title")
+        .single();
+      
+      if (data?.login_title) {
+        setLoginTitle(data.login_title);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,7 +96,7 @@ export default function LoginPage() {
             <GraduationCap className="w-9 h-9 text-white" />
           </div>
           <div>
-            <CardTitle className="text-2xl font-bold text-white">Virtual Classroom LMS 2</CardTitle>
+            <CardTitle className="text-2xl font-bold text-white">{loginTitle}</CardTitle>
             <CardDescription className="text-slate-400 mt-2">
               Sign in to access your learning platform
             </CardDescription>
