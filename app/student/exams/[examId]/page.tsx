@@ -97,12 +97,13 @@ export default function ExamTakingPage() {
 
       // Shuffle answer options if enabled
       const shuffledQuestions: ShuffledQuestion[] = processedQuestions.map((q) => {
+        // Normalize option values to handle special characters (Spanish accents, etc.)
         let options = [
-          { key: "A", value: q.option_a },
-          { key: "B", value: q.option_b },
-          { key: "C", value: q.option_c },
-          { key: "D", value: q.option_d },
-        ];
+          { key: "A", value: (q.option_a || "").normalize("NFC") },
+          { key: "B", value: (q.option_b || "").normalize("NFC") },
+          { key: "C", value: (q.option_c || "").normalize("NFC") },
+          { key: "D", value: (q.option_d || "").normalize("NFC") },
+        ].filter(opt => opt.value); // Filter out empty options
 
         if (examRes.data.randomize_answers) {
           options = shuffleArray(options);
@@ -156,7 +157,9 @@ export default function ExamTakingPage() {
   };
 
   const handleAnswer = (questionId: string, answer: string) => {
-    setAnswers((prev) => ({ ...prev, [questionId]: answer }));
+    // Normalize the answer string to handle special characters (Spanish accents, etc.)
+    const normalizedAnswer = answer?.normalize("NFC") || "";
+    setAnswers((prev) => ({ ...prev, [questionId]: normalizedAnswer }));
   };
 
   const handleSubmitExam = async () => {
@@ -168,7 +171,12 @@ export default function ExamTakingPage() {
     let score = 0;
     questions.forEach((q) => {
       if (q.shuffledOptions && answers[q.id]) {
-        const selectedOption = q.shuffledOptions.find((opt) => answers[q.id] === opt.value);
+        // Normalize strings for comparison to handle special characters (Spanish accents, etc.)
+        const normalizedAnswer = answers[q.id]?.normalize("NFC") || "";
+        const selectedOption = q.shuffledOptions.find((opt) => {
+          const normalizedOptValue = opt.value?.normalize("NFC") || "";
+          return normalizedAnswer === normalizedOptValue;
+        });
         if (selectedOption && selectedOption.key === q.correct_answer) {
           score++;
         }
@@ -411,7 +419,9 @@ export default function ExamTakingPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           {currentQuestion.shuffledOptions.map((option, index) => {
-            const isSelected = answers[currentQuestion.id] === option.value;
+            const normalizedAnswer = answers[currentQuestion.id]?.normalize("NFC") || "";
+            const normalizedValue = option.value?.normalize("NFC") || "";
+            const isSelected = normalizedAnswer === normalizedValue;
             return (
               <button
                 key={index}
