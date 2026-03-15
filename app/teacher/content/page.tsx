@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { FolderPlus, Upload, Folder, FileText, Video, Presentation, Trash2, ChevronRight, ChevronDown } from "lucide-react"
+import { FolderPlus, Upload, Folder, FileText, Video, Presentation, Trash2, ChevronRight, ChevronDown, Link2 } from "lucide-react"
 import type { Folder as FolderType, FileItem } from "@/lib/types"
 
 interface FolderWithChildren extends FolderType {
@@ -28,11 +28,18 @@ export default function TeacherContentPage() {
   // Dialog states
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
+  const [externalLinkDialogOpen, setExternalLinkDialogOpen] = useState(false)
   const [newFolderName, setNewFolderName] = useState("")
   const [parentFolderId, setParentFolderId] = useState<string | null>(null)
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploadFolderId, setUploadFolderId] = useState<string>("")
   const [uploading, setUploading] = useState(false)
+  
+  // External link states
+  const [externalLinkName, setExternalLinkName] = useState("")
+  const [externalLinkUrl, setExternalLinkUrl] = useState("")
+  const [externalLinkFolderId, setExternalLinkFolderId] = useState<string>("")
+  const [savingExternalLink, setSavingExternalLink] = useState(false)
 
   const loadFolders = useCallback(async () => {
     const supabase = createClient()
@@ -177,6 +184,48 @@ export default function TeacherContentPage() {
     setUploading(false)
   }
 
+  const handleAddExternalLink = async () => {
+    if (!externalLinkName.trim() || !externalLinkUrl.trim() || !externalLinkFolderId) return
+
+    // Validate URL is from Google Drive or OneDrive
+    const isGoogleDrive = externalLinkUrl.includes("drive.google.com")
+    const isOneDrive = externalLinkUrl.includes("onedrive.live.com") || 
+                       externalLinkUrl.includes("1drv.ms") || 
+                       externalLinkUrl.includes("sharepoint.com")
+
+    if (!isGoogleDrive && !isOneDrive) {
+      alert("Please enter a valid Google Drive or OneDrive link")
+      return
+    }
+
+    setSavingExternalLink(true)
+    const supabase = createClient()
+
+    // Create file record for external video
+    const { error } = await supabase.from("files").insert({
+      name: externalLinkName,
+      type: "external_video",
+      file_url: "", // No file URL for external links
+      external_url: externalLinkUrl,
+      is_external: true,
+      folder_id: externalLinkFolderId,
+      uploaded_by: user!.id,
+      file_size: 0,
+    })
+
+    if (!error) {
+      setExternalLinkName("")
+      setExternalLinkUrl("")
+      setExternalLinkFolderId("")
+      setExternalLinkDialogOpen(false)
+      loadFolders()
+    } else {
+      alert("Failed to add external link: " + error.message)
+    }
+
+    setSavingExternalLink(false)
+  }
+
   const handleDeleteFolder = async (folderId: string) => {
     if (!confirm("Are you sure you want to delete this folder and all its contents?")) return
 
@@ -197,6 +246,8 @@ export default function TeacherContentPage() {
     switch (type) {
       case "video":
         return <Video className="h-4 w-4 text-blue-500" />
+      case "external_video":
+        return <Link2 className="h-4 w-4 text-purple-500" />
       case "pdf":
         return <FileText className="h-4 w-4 text-red-500" />
       case "powerpoint":
@@ -332,6 +383,77 @@ export default function TeacherContentPage() {
                   Cancel
                 </Button>
                 <Button onClick={handleCreateFolder}>Create Folder</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={externalLinkDialogOpen} onOpenChange={setExternalLinkDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Link2 className="mr-2 h-4 w-4" />
+                Add Video Link
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add External Video Link</DialogTitle>
+                <DialogDescription>
+                  Add a video from Google Drive or OneDrive. The link will be hidden from students.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <Field>
+                  <FieldLabel>Video Name</FieldLabel>
+                  <Input
+                    value={externalLinkName}
+                    onChange={(e) => setExternalLinkName(e.target.value)}
+                    placeholder="Enter a name for this video"
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel>Video Link</FieldLabel>
+                  <Input
+                    value={externalLinkUrl}
+                    onChange={(e) => setExternalLinkUrl(e.target.value)}
+                    placeholder="Paste Google Drive or OneDrive link"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Supported: Google Drive sharing links, OneDrive/SharePoint links
+                  </p>
+                </Field>
+                <Field>
+                  <FieldLabel>Select Folder</FieldLabel>
+                  <Select value={externalLinkFolderId} onValueChange={setExternalLinkFolderId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select folder" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allFolders.map((f) => (
+                        <SelectItem key={f.id} value={f.id}>
+                          {f.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <div className="bg-muted/50 p-3 rounded-lg">
+                  <p className="text-sm font-medium mb-2">How to get the link:</p>
+                  <ul className="text-xs text-muted-foreground space-y-1">
+                    <li><strong>Google Drive:</strong> Right-click the video → Share → Copy link (make sure "Anyone with the link can view")</li>
+                    <li><strong>OneDrive:</strong> Right-click the video → Share → Copy link (set to "Anyone with the link")</li>
+                  </ul>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setExternalLinkDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleAddExternalLink} 
+                  disabled={savingExternalLink || !externalLinkName || !externalLinkUrl || !externalLinkFolderId}
+                >
+                  {savingExternalLink ? "Adding..." : "Add Video Link"}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
