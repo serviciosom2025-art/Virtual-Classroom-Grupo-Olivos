@@ -1,10 +1,11 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from "react";
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward, AlertCircle } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward, AlertCircle, X } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
+import { createPortal } from "react-dom";
 
 interface VideoPlayerProps {
   url: string;
@@ -23,22 +24,41 @@ export function VideoPlayer({ url, canDownload = true }: VideoPlayerProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Handle fullscreen change events
+  // Detect mobile device
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+    const checkMobile = () => {
+      setIsMobile(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768);
     };
-
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
-    
-    return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
-    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+  // Handle escape key to exit CSS fullscreen
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isFullscreen && isMobile) {
+        setIsFullscreen(false);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen, isMobile]);
+
+  // Lock body scroll when in mobile fullscreen
+  useEffect(() => {
+    if (isFullscreen && isMobile) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isFullscreen, isMobile]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -116,24 +136,33 @@ export function VideoPlayer({ url, canDownload = true }: VideoPlayerProps) {
   };
 
   const toggleFullscreen = useCallback(async () => {
+    // On mobile: use CSS-based fullscreen to prevent native controls
+    if (isMobile || !canDownload) {
+      setIsFullscreen(prev => !prev);
+      return;
+    }
+
+    // On desktop with download allowed: use native fullscreen
     const container = containerRef.current;
     if (!container) return;
 
     try {
       if (document.fullscreenElement) {
         await document.exitFullscreen();
+        setIsFullscreen(false);
       } else {
-        // Use container fullscreen to keep custom controls (prevents native download option)
         if (container.requestFullscreen) {
           await container.requestFullscreen();
         } else if ((container as any).webkitRequestFullscreen) {
           await (container as any).webkitRequestFullscreen();
         }
+        setIsFullscreen(true);
       }
     } catch (err) {
-      console.error("Fullscreen error:", err);
+      // Fallback to CSS fullscreen if native fails
+      setIsFullscreen(prev => !prev);
     }
-  }, []);
+  }, [isMobile, canDownload]);
 
   const skip = (seconds: number) => {
     const video = videoRef.current;
@@ -186,34 +215,59 @@ export function VideoPlayer({ url, canDownload = true }: VideoPlayerProps) {
     );
   }
 
-  return (
+  // Video player content (used both in normal and fullscreen modes)
+  const videoContent = (
     <div
       ref={containerRef}
-      className={`relative h-full bg-black flex items-center justify-center group ${isFullscreen ? 'fullscreen-container' : ''}`}
+      className={`relative bg-black flex items-center justify-center group ${
+        isFullscreen && (isMobile || !canDownload)
+          ? 'fixed inset-0 z-[9999] w-screen h-screen'
+          : 'h-full'
+      }`}
       onMouseEnter={() => setShowControls(true)}
       onMouseLeave={() => setShowControls(isPlaying ? false : true)}
       onTouchStart={handleTouchStart}
       onContextMenu={handleContextMenu}
+      style={isFullscreen && (isMobile || !canDownload) ? { 
+        position: 'fixed', 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        bottom: 0,
+        zIndex: 9999,
+        backgroundColor: 'black'
+      } : undefined}
     >
+      {/* Close button for CSS fullscreen */}
+      {isFullscreen && (isMobile || !canDownload) && (
+        <button
+          onClick={() => setIsFullscreen(false)}
+          className="absolute top-4 right-4 z-50 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors"
+          style={{ WebkitTapHighlightColor: 'transparent' }}
+        >
+          <X className="w-6 h-6" />
+        </button>
+      )}
+
       {/* Prevent download overlay - blocks long-press on mobile */}
       {!canDownload && (
         <div 
           className="absolute inset-0 z-10" 
           onContextMenu={handleContextMenu}
-          style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' }}
+          style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
         />
       )}
       <video
         ref={videoRef}
         src={url}
-        className="max-h-full max-w-full pointer-events-none"
+        className={`pointer-events-none ${isFullscreen ? 'w-full h-full object-contain' : 'max-h-full max-w-full'}`}
         onContextMenu={handleContextMenu}
         controlsList="nodownload nofullscreen noremoteplayback"
         disablePictureInPicture
         playsInline
         preload="metadata"
         controls={false}
-        style={{ WebkitTouchCallout: 'none' }}
+        style={{ WebkitTouchCallout: 'none', userSelect: 'none' }}
       />
 
       {/* Loading Overlay */}
@@ -293,4 +347,11 @@ export function VideoPlayer({ url, canDownload = true }: VideoPlayerProps) {
       </button>
     </div>
   );
+
+  // For CSS fullscreen on mobile, render in a portal to escape any overflow:hidden containers
+  if (isFullscreen && (isMobile || !canDownload) && typeof document !== 'undefined') {
+    return createPortal(videoContent, document.body);
+  }
+
+  return videoContent;
 }
