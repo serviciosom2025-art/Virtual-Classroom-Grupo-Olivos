@@ -1,9 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   GraduationCap,
   Users,
@@ -16,20 +25,34 @@ import {
   ChevronRight,
   Home,
   BookOpen,
+  AlertTriangle,
 } from "lucide-react";
 
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
   sidebarColor: string;
+  isExamLocked?: boolean;
+  examTitle?: string;
 }
 
-export function Sidebar({ collapsed, onToggle, sidebarColor }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, sidebarColor, isExamLocked = false, examTitle = "" }: SidebarProps) {
   const { profile, settings } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
+  const [showExamWarning, setShowExamWarning] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
 
   const role = profile?.role || "student";
+
+  const handleNavigation = (href: string) => {
+    if (isExamLocked && !pathname.includes(href)) {
+      setPendingNavigation(href);
+      setShowExamWarning(true);
+    } else {
+      router.push(href);
+    }
+  };
 
   const adminLinks = [
     { href: "/admin", label: "Dashboard", icon: Home },
@@ -104,14 +127,15 @@ export function Sidebar({ collapsed, onToggle, sidebarColor }: SidebarProps) {
             return (
               <li key={link.href}>
                 <button
-                  onClick={() => router.push(link.href)}
+                  onClick={() => handleNavigation(link.href)}
                   className={cn(
                     "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left",
                     active
                       ? "bg-white/15 text-white"
-                      : "text-white/70 hover:bg-white/10 hover:text-white"
+                      : "text-white/70 hover:bg-white/10 hover:text-white",
+                    isExamLocked && !active && "opacity-50 cursor-not-allowed"
                   )}
-                  title={collapsed ? link.label : undefined}
+                  title={collapsed ? link.label : isExamLocked && !active ? "Complete the exam first" : undefined}
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
                   {!collapsed && <span className="truncate">{link.label}</span>}
@@ -140,6 +164,28 @@ export function Sidebar({ collapsed, onToggle, sidebarColor }: SidebarProps) {
           )}
         </Button>
       </div>
+
+      {/* Exam Lock Warning Dialog */}
+      <Dialog open={showExamWarning} onOpenChange={setShowExamWarning}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="w-5 h-5" />
+              Exam in Progress
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              You are currently taking the exam: <strong>{examTitle}</strong>
+              <br /><br />
+              You cannot navigate to other sections while the exam is in progress. Please complete or submit your exam first.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setShowExamWarning(false)}>
+              Continue Exam
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </aside>
   );
 }

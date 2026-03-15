@@ -6,13 +6,27 @@ import { Sidebar } from "./sidebar";
 import { Navbar } from "./navbar";
 import { Spinner } from "@/components/ui/spinner";
 
+// Safe hook to use exam lock - returns default values if not in student context
+function useSafeExamLock() {
+  try {
+    // Dynamic import to avoid errors in non-student contexts
+    const { useExamLock } = require("@/lib/exam-lock-context");
+    return useExamLock();
+  } catch {
+    return { isExamInProgress: false, examTitle: "" };
+  }
+}
+
 interface DashboardShellProps {
   children: React.ReactNode;
 }
 
 export function DashboardShell({ children }: DashboardShellProps) {
-  const { isLoading, settings } = useAuth();
+  const { isLoading, settings, profile } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  
+  // Only use exam lock for students
+  const examLock = profile?.role === "student" ? useSafeExamLock() : { isExamInProgress: false, examTitle: "" };
 
   if (isLoading) {
     return (
@@ -42,6 +56,8 @@ export function DashboardShell({ children }: DashboardShellProps) {
         collapsed={sidebarCollapsed} 
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         sidebarColor={sidebarColor}
+        isExamLocked={examLock.isExamInProgress}
+        examTitle={examLock.examTitle}
       />
       <div className={`flex-1 flex flex-col transition-all duration-300 ${sidebarCollapsed ? "ml-16" : "ml-64"}`}>
         <Navbar />
