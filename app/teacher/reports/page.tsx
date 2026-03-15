@@ -326,18 +326,18 @@ export default function TeacherReportsPage() {
       .eq("status", "completed")
       .order("completed_at", { ascending: false });
 
-    const { data: folders } = await supabase
+    const { data: foldersData } = await supabase
       .from("folders")
       .select("id, name, parent_id");
 
-    const folderMap = new Map(folders?.map(f => [f.id, f]) || []);
+    const localFolderMap = new Map(foldersData?.map(f => [f.id, f]) || []);
     
     function getFolderPath(folderId: string | null): string {
       if (!folderId) return "Root";
       const parts: string[] = [];
       let currentId: string | null = folderId;
       while (currentId) {
-        const folder = folderMap.get(currentId);
+        const folder = localFolderMap.get(currentId);
         if (folder) {
           parts.unshift(folder.name);
           currentId = folder.parent_id;
@@ -348,8 +348,36 @@ export default function TeacherReportsPage() {
       return parts.join(" / ") || "Root";
     }
 
+    // Get descendant folder IDs for filtering
+    function getLocalDescendantFolderIds(folderId: string): string[] {
+      const descendants: string[] = [folderId];
+      const queue = [folderId];
+      while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        localFolderMap.forEach((folder, id) => {
+          if (folder.parent_id === currentId && !descendants.includes(id)) {
+            descendants.push(id);
+            queue.push(id);
+          }
+        });
+      }
+      return descendants;
+    }
+
+    // Filter lessons based on selected folder
+    const includedFolderIds = selectedFolderId === "all" 
+      ? null 
+      : getLocalDescendantFolderIds(selectedFolderId);
+
     const lessons: CompletedLesson[] = (progressData || [])
-      .filter(p => p.file)
+      .filter(p => {
+        if (!p.file) return false;
+        // If no folder filter, include all
+        if (!includedFolderIds) return true;
+        // Check if file's folder is in the included folders
+        const fileFolderId = (p.file as any).folder_id;
+        return fileFolderId && includedFolderIds.includes(fileFolderId);
+      })
       .map(p => ({
         id: p.id,
         file_name: (p.file as any).name,
