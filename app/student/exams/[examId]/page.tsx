@@ -90,14 +90,20 @@ export default function ExamTakingPage() {
       // Process questions
       let processedQuestions = questionsRes.data || [];
 
-      // Randomize questions if enabled
-      if (examRes.data.randomize_questions) {
-        processedQuestions = shuffleArray(processedQuestions);
-      }
+      // Always shuffle questions first to get random selection from the bank
+      // This ensures different questions are shown on each attempt
+      processedQuestions = shuffleArray(processedQuestions);
 
       // Limit questions to the configured questions_count
       const questionsToShow = examRes.data.questions_count || processedQuestions.length;
       processedQuestions = processedQuestions.slice(0, questionsToShow);
+
+      // If randomize_questions is disabled, sort by created_at or id for consistent order within the selected questions
+      if (!examRes.data.randomize_questions) {
+        processedQuestions = processedQuestions.sort((a, b) => 
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+      }
 
       // Shuffle answer options if enabled
       const shuffledQuestions: ShuffledQuestion[] = processedQuestions.map((q) => {
