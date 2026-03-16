@@ -73,26 +73,7 @@ export default function TeacherContentPage() {
     
     const supabase = createClient()
 
-    // Load teacher permissions for this user
-    const { data: permissionsData } = await supabase
-      .from("teacher_folder_permissions")
-      .select("folder_id, can_view, can_edit")
-      .eq("teacher_id", user.id)
-
-    // Build permission sets
-    const viewable = new Set<string>()
-    const editable = new Set<string>()
-    
-    permissionsData?.forEach((p) => {
-      if (p.can_view) viewable.add(p.folder_id)
-      if (p.can_edit) editable.add(p.folder_id)
-    })
-    
-    setViewableFolderIds(viewable)
-    setEditableFolderIds(editable)
-    setHasPermissionsRestrictions(permissionsData && permissionsData.length > 0)
-
-    // Load all folders
+    // Load all folders first
     const { data: foldersData } = await supabase
       .from("folders")
       .select("*")
@@ -104,25 +85,57 @@ export default function TeacherContentPage() {
       .select("*")
       .order("position, name")
 
+    // Load teacher permissions for this user
+    const { data: permissionsData } = await supabase
+      .from("teacher_folder_permissions")
+      .select("folder_id, can_view, can_edit")
+      .eq("teacher_id", user.id)
+
+    // Build permission maps based on folder restrictions
+    const viewable = new Set<string>()
+    const editable = new Set<string>()
+    const restrictedFolderIds = new Set<string>()
+    
+    // Track which folders are teacher-restricted
+    foldersData?.forEach((folder) => {
+      if (folder.is_teacher_restricted) {
+        restrictedFolderIds.add(folder.id)
+      }
+    })
+    
+    // For restricted folders, use specific permissions
+    permissionsData?.forEach((p) => {
+      if (p.can_view) viewable.add(p.folder_id)
+      if (p.can_edit) editable.add(p.folder_id)
+    })
+    
+    setViewableFolderIds(viewable)
+    setEditableFolderIds(editable)
+    setHasPermissionsRestrictions(restrictedFolderIds.size > 0)
+
     if (foldersData) {
-      // If teacher has specific permissions, filter folders
-      let filteredFolders = foldersData
-      if (permissionsData && permissionsData.length > 0) {
-        // Get all viewable folder IDs including parent folders for navigation
-        const viewableFolderIdsWithParents = new Set<string>(viewable)
-        
-        // For each viewable folder, also include its parent folders for navigation
-        const addParentFolders = (folderId: string) => {
-          const folder = foldersData.find(f => f.id === folderId)
-          if (folder?.parent_id) {
-            viewableFolderIdsWithParents.add(folder.parent_id)
-            addParentFolders(folder.parent_id)
+      // Filter folders: show all non-restricted + restricted ones the teacher has view access to
+      let filteredFolders = foldersData.filter(folder => {
+        // If folder is not restricted, teacher can see it
+        if (!folder.is_teacher_restricted) return true
+        // If folder is restricted, check if teacher has view permission
+        return viewable.has(folder.id)
+      })
+      
+      // Also include parent folders for navigation purposes
+      const includedFolderIds = new Set(filteredFolders.map(f => f.id))
+      const addParentFolders = (folderId: string) => {
+        const folder = foldersData.find(f => f.id === folderId)
+        if (folder?.parent_id && !includedFolderIds.has(folder.parent_id)) {
+          const parentFolder = foldersData.find(f => f.id === folder.parent_id)
+          if (parentFolder) {
+            filteredFolders.push(parentFolder)
+            includedFolderIds.add(parentFolder.id)
+            addParentFolders(parentFolder.id)
           }
         }
-        viewable.forEach(folderId => addParentFolders(folderId))
-        
-        filteredFolders = foldersData.filter(f => viewableFolderIdsWithParents.has(f.id))
       }
+      filteredFolders.forEach(f => addParentFolders(f.id))
       
       setAllFolders(filteredFolders)
       // Build tree structure
@@ -179,14 +192,20 @@ export default function TeacherContentPage() {
 
   // Check if teacher can edit a specific folder
   const canEditFolder = (folderId: string): boolean => {
-    // If no permissions set, teacher can edit all folders
-    if (!hasPermissionsRestrictions) return true
+    // Find the folder to check if it's restricted
+    const folder = allFolders.find(f => f.id === folderId)
+    // If folder is not restricted, all teachers can edit
+    if (!folder?.is_teacher_restricted) return true
+    // If restricted, check specific permissions
     return editableFolderIds.has(folderId)
   }
   
   // Check if teacher can view a folder (for showing in dropdowns)
   const canViewFolder = (folderId: string): boolean => {
-    if (!hasPermissionsRestrictions) return true
+    const folder = allFolders.find(f => f.id === folderId)
+    // If folder is not restricted, all teachers can view
+    if (!folder?.is_teacher_restricted) return true
+    // If restricted, check specific permissions
     return viewableFolderIds.has(folderId)
   }
 
