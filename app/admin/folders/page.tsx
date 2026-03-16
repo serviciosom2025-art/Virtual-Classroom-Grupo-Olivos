@@ -27,6 +27,7 @@ import {
   Link2,
   Users,
   Lock,
+  X,
 } from "lucide-react";
 import { FolderPermissionsDialog } from "@/components/folders/folder-permissions-dialog";
 import {
@@ -519,8 +520,24 @@ export default function FoldersPage() {
         </Dialog>
 
         {/* File Viewer */}
-        <Card className="flex-1 bg-white shadow-sm overflow-hidden">
-          <CardContent className="h-full p-0">
+        <Card className="flex-1 bg-white shadow-sm overflow-hidden flex flex-col">
+          {selectedFile && (
+            <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/30 flex-shrink-0">
+              <div>
+                <span className="font-medium text-sm">File Preview</span>
+                <p className="text-xs text-muted-foreground truncate">{selectedFile.name}</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 flex-shrink-0"
+                onClick={() => setSelectedFile(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          <CardContent className="flex-1 h-full p-0 overflow-hidden">
             {selectedFile ? (
               <FileViewer file={selectedFile} />
             ) : (
