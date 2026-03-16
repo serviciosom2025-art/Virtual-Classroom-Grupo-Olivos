@@ -12,8 +12,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  BarChart3,
-  TrendingUp,
   Users,
   BookOpen,
   ClipboardList,
@@ -23,8 +21,6 @@ import {
   XCircle,
   FolderOpen,
   Search,
-  Award,
-  ChevronDown,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Profile } from "@/lib/types";
@@ -548,11 +544,6 @@ export default function TeacherReportsPage() {
 
   if (!data) return null;
 
-  const engagementRate =
-    data.totalStudents > 0
-      ? Math.round((data.activeStudents / data.totalStudents) * 100)
-      : 0;
-
   return (
     <div className="space-y-6">
       <div>
@@ -569,9 +560,9 @@ export default function TeacherReportsPage() {
                 <Users className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Engagement Rate</p>
-                <p className="text-2xl font-bold text-slate-800">{engagementRate}%</p>
-                <p className="text-xs text-slate-400">{data.activeStudents}/{data.totalStudents} students</p>
+                <p className="text-sm text-slate-500">Total Students</p>
+                <p className="text-2xl font-bold text-slate-800">{data.totalStudents}</p>
+                <p className="text-xs text-slate-400">{data.activeStudents} active</p>
               </div>
             </div>
           </CardContent>
@@ -619,84 +610,6 @@ export default function TeacherReportsPage() {
                 <p className="text-xs text-slate-400">overall average</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Top Exams */}
-        <Card className="bg-white shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-purple-600" />
-              Top Exams by Attempts
-            </CardTitle>
-            <CardDescription>Most popular exams among students</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {data.topExams.length === 0 ? (
-              <p className="text-slate-500 text-center py-4">No exam data yet</p>
-            ) : (
-              <div className="space-y-4">
-                {data.topExams.map((exam, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center text-purple-600 font-medium">
-                        {index + 1}
-                      </div>
-                      <div>
-                        <p className="font-medium text-slate-800">{exam.title}</p>
-                        <p className="text-sm text-slate-500">{exam.attempts} attempts</p>
-                      </div>
-                    </div>
-                    <Badge
-                      className={
-                        exam.avgScore >= 70
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-amber-100 text-amber-700"
-                      }
-                    >
-                      Avg: {exam.avgScore}%
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Popular Content */}
-        <Card className="bg-white shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-emerald-600" />
-              Most Completed Content
-            </CardTitle>
-            <CardDescription>Learning materials with highest completion</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {data.popularContent.length === 0 ? (
-              <p className="text-slate-500 text-center py-4">No completion data yet</p>
-            ) : (
-              <div className="space-y-4">
-                {data.popularContent.map((content, index) => {
-                  const maxCompletions = data.popularContent[0]?.completions || 1;
-                  const percent = Math.round((content.completions / maxCompletions) * 100);
-
-                  return (
-                    <div key={index} className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium text-slate-800 truncate max-w-[200px]">
-                          {content.name}
-                        </p>
-                        <Badge variant="outline">{content.completions} completions</Badge>
-                      </div>
-                      <Progress value={percent} className="h-2" />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </CardContent>
         </Card>
       </div>
