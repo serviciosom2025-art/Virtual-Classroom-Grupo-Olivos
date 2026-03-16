@@ -28,8 +28,10 @@ import {
   Users,
   Lock,
   X,
+  ListOrdered,
 } from "lucide-react";
 import { FolderPermissionsDialog } from "@/components/folders/folder-permissions-dialog";
+import { FileOrderManager } from "@/components/folders/file-order-manager";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,6 +62,7 @@ export default function FoldersPage() {
   const [editFolderOpen, setEditFolderOpen] = useState(false);
   const [externalLinkOpen, setExternalLinkOpen] = useState(false);
   const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
+  const [fileOrderDialogOpen, setFileOrderDialogOpen] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
 
   // Form states
@@ -78,7 +81,7 @@ export default function FoldersPage() {
     try {
       const [foldersRes, filesRes] = await Promise.all([
         supabase.from("folders").select("*").order("name"),
-        supabase.from("files").select("*").order("name"),
+        supabase.from("files").select("*").order("position, name"),
       ]);
 
       setFolders(foldersRes.data || []);
@@ -472,6 +475,13 @@ export default function FoldersPage() {
                             <Lock className="w-3 h-3 ml-2 text-amber-500" />
                           )}
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setFileOrderDialogOpen(true)}>
+                          <ListOrdered className="w-4 h-4 mr-2" />
+                          File Order
+                          {selectedFolderData?.sequential_order && (
+                            <Lock className="w-3 h-3 ml-2 text-amber-500" />
+                          )}
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={handleDeleteFolder} className="text-red-600">
                           <Trash2 className="w-4 h-4 mr-2" />
                           Delete Folder
@@ -560,6 +570,19 @@ export default function FoldersPage() {
           folderId={selectedFolderId}
           folderName={selectedFolderData.name}
           isRestricted={selectedFolderData.is_restricted || false}
+          onSave={fetchData}
+        />
+      )}
+
+      {/* File Order Manager Dialog */}
+      {selectedFolderId && selectedFolderData && (
+        <FileOrderManager
+          open={fileOrderDialogOpen}
+          onOpenChange={setFileOrderDialogOpen}
+          folderId={selectedFolderId}
+          folderName={selectedFolderData.name}
+          files={files.filter(f => f.folder_id === selectedFolderId)}
+          sequentialOrder={selectedFolderData.sequential_order || false}
           onSave={fetchData}
         />
       )}

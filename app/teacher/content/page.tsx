@@ -9,9 +9,10 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { FolderPlus, Upload, Folder, FileText, Video, Presentation, Trash2, ChevronRight, ChevronDown, Link2, X, Users, Lock } from "lucide-react"
+import { FolderPlus, Upload, Folder, FileText, Video, Presentation, Trash2, ChevronRight, ChevronDown, Link2, X, Users, Lock, ListOrdered } from "lucide-react"
 import { FileViewer } from "@/components/viewers/file-viewer"
 import { FolderPermissionsDialog } from "@/components/folders/folder-permissions-dialog"
+import { FileOrderManager } from "@/components/folders/file-order-manager"
 import type { Folder as FolderType, FileItem } from "@/lib/types"
 
 interface FolderWithChildren extends FolderType {
@@ -47,6 +48,10 @@ export default function TeacherContentPage() {
   // Permissions dialog state
   const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false)
   const [permissionsFolderId, setPermissionsFolderId] = useState<string | null>(null)
+  
+  // File order dialog state
+  const [fileOrderDialogOpen, setFileOrderDialogOpen] = useState(false)
+  const [fileOrderFolderId, setFileOrderFolderId] = useState<string | null>(null)
 
   const loadFolders = useCallback(async () => {
     const supabase = createClient()
@@ -61,7 +66,7 @@ export default function TeacherContentPage() {
     const { data: filesData } = await supabase
       .from("files")
       .select("*")
-      .order("name")
+      .order("position, name")
 
     if (foldersData) {
       setAllFolders(foldersData)
@@ -303,6 +308,19 @@ export default function TeacherContentPage() {
             }}
           >
             <Users className="h-3 w-3 text-muted-foreground" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 opacity-0 group-hover:opacity-100"
+            title="File Order"
+            onClick={(e) => {
+              e.stopPropagation()
+              setFileOrderFolderId(folder.id)
+              setFileOrderDialogOpen(true)
+            }}
+          >
+            <ListOrdered className="h-3 w-3 text-muted-foreground" />
           </Button>
           <Button
             variant="ghost"
@@ -603,6 +621,26 @@ export default function TeacherContentPage() {
           onSave={loadFolders}
         />
       )}
+
+      {/* File Order Manager Dialog */}
+      {fileOrderFolderId && (() => {
+        const folder = allFolders.find(f => f.id === fileOrderFolderId);
+        const folderFiles = folders.flatMap(function findFiles(f: FolderWithChildren): FileItem[] {
+          if (f.id === fileOrderFolderId) return f.files;
+          return f.children.flatMap(findFiles);
+        });
+        return (
+          <FileOrderManager
+            open={fileOrderDialogOpen}
+            onOpenChange={setFileOrderDialogOpen}
+            folderId={fileOrderFolderId}
+            folderName={folder?.name || ""}
+            files={folderFiles}
+            sequentialOrder={folder?.sequential_order || false}
+            onSave={loadFolders}
+          />
+        );
+      })()}
     </div>
   )
 }
