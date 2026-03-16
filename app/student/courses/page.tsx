@@ -9,7 +9,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { FolderTree } from "@/components/folders/folder-tree";
 import { FileViewer } from "@/components/viewers/file-viewer";
 import { X } from "lucide-react";
-import type { Folder, FileItem, StudentProgress } from "@/lib/types";
+import type { Folder, FileItem, StudentProgress, FolderPermission } from "@/lib/types";
 
 export default function StudentCoursesPage() {
   const { user } = useAuth();
@@ -23,6 +23,78 @@ export default function StudentCoursesPage() {
 
   const supabase = createClient();
 
+  // Filter folders based on permissions - hierarchical filtering
+  const filterFoldersForStudent = useCallback((
+    allFolders: Folder[],
+    allFiles: FileItem[],
+    permissions: FolderPermission[]
+  ): { filteredFolders: Folder[]; filteredFiles: FileItem[] } => {
+    if (!user) return { filteredFolders: [], filteredFiles: [] };
+
+    const permittedFolderIds = new Set(permissions.map(p => p.folder_id));
+    
+    // Determine which folders the student can access
+    const accessibleFolderIds = new Set<string>();
+    
+    // First pass: identify directly accessible folders
+    allFolders.forEach(folder => {
+      // If folder is not restricted, it's accessible
+      // If folder is restricted, check if student has permission
+      if (!folder.is_restricted || permittedFolderIds.has(folder.id)) {
+        accessibleFolderIds.add(folder.id);
+      }
+    });
+    
+    // Second pass: for restricted folders, check if any child is accessible
+    // This ensures parent folders appear when children are accessible
+    const hasAccessibleDescendant = (folderId: string): boolean => {
+      // Check if this folder has any accessible children
+      const childFolders = allFolders.filter(f => f.parent_id === folderId);
+      const childFiles = allFiles.filter(f => f.folder_id === folderId);
+      
+      // If this folder has files and is accessible, it counts
+      if (accessibleFolderIds.has(folderId) && childFiles.length > 0) {
+        return true;
+      }
+      
+      // Check children recursively
+      for (const child of childFolders) {
+        if (accessibleFolderIds.has(child.id)) {
+          return true;
+        }
+        if (hasAccessibleDescendant(child.id)) {
+          return true;
+        }
+      }
+      
+      return false;
+    };
+    
+    // Build set of folders to show (including parents that have accessible descendants)
+    const foldersToShow = new Set<string>();
+    
+    allFolders.forEach(folder => {
+      if (accessibleFolderIds.has(folder.id)) {
+        // Add this folder and all its ancestors
+        foldersToShow.add(folder.id);
+        let currentParentId = folder.parent_id;
+        while (currentParentId) {
+          foldersToShow.add(currentParentId);
+          const parentFolder = allFolders.find(f => f.id === currentParentId);
+          currentParentId = parentFolder?.parent_id || null;
+        }
+      }
+    });
+    
+    // Filter folders
+    const filteredFolders = allFolders.filter(folder => foldersToShow.has(folder.id));
+    
+    // Filter files - only show files in accessible folders
+    const filteredFiles = allFiles.filter(file => accessibleFolderIds.has(file.folder_id));
+    
+    return { filteredFolders, filteredFiles };
+  }, [user]);
+
   const fetchData = useCallback(async () => {
     if (!user) {
       setLoading(false);
@@ -30,21 +102,29 @@ export default function StudentCoursesPage() {
     }
 
     try {
-      const [foldersRes, filesRes, progressRes] = await Promise.all([
+      const [foldersRes, filesRes, progressRes, permissionsRes] = await Promise.all([
         supabase.from("folders").select("*").order("name"),
         supabase.from("files").select("*").order("name"),
         supabase.from("student_progress").select("*").eq("student_id", user.id),
+        supabase.from("folder_permissions").select("*").eq("student_id", user.id),
       ]);
 
-      setFolders(foldersRes.data || []);
-      setFiles(filesRes.data || []);
+      const allFolders = foldersRes.data || [];
+      const allFiles = filesRes.data || [];
+      const permissions = permissionsRes.data || [];
+      
+      // Apply permission filtering
+      const { filteredFolders, filteredFiles } = filterFoldersForStudent(allFolders, allFiles, permissions);
+
+      setFolders(filteredFolders);
+      setFiles(filteredFiles);
       setProgress(progressRes.data || []);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, filterFoldersForStudent]);
 
   useEffect(() => {
     fetchData();

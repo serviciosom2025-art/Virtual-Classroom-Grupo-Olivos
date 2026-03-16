@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { FolderPlus, Upload, Folder, FileText, Video, Presentation, Trash2, ChevronRight, ChevronDown, Link2, X } from "lucide-react"
+import { FolderPlus, Upload, Folder, FileText, Video, Presentation, Trash2, ChevronRight, ChevronDown, Link2, X, Users, Lock } from "lucide-react"
 import { FileViewer } from "@/components/viewers/file-viewer"
+import { FolderPermissionsDialog } from "@/components/folders/folder-permissions-dialog"
 import type { Folder as FolderType, FileItem } from "@/lib/types"
 
 interface FolderWithChildren extends FolderType {
@@ -42,6 +43,10 @@ export default function TeacherContentPage() {
   const [externalLinkUrl, setExternalLinkUrl] = useState("")
   const [externalLinkFolderId, setExternalLinkFolderId] = useState<string>("")
   const [savingExternalLink, setSavingExternalLink] = useState(false)
+  
+  // Permissions dialog state
+  const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false)
+  const [permissionsFolderId, setPermissionsFolderId] = useState<string | null>(null)
 
   const loadFolders = useCallback(async () => {
     const supabase = createClient()
@@ -283,6 +288,22 @@ export default function TeacherContentPage() {
           )}
           <Folder className="h-4 w-4 text-yellow-500" />
           <span className="flex-1 text-sm font-medium">{folder.name}</span>
+          {folder.is_restricted && (
+            <Lock className="h-3 w-3 text-amber-500" />
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 opacity-0 group-hover:opacity-100"
+            title="Manage Access"
+            onClick={(e) => {
+              e.stopPropagation()
+              setPermissionsFolderId(folder.id)
+              setPermissionsDialogOpen(true)
+            }}
+          >
+            <Users className="h-3 w-3 text-muted-foreground" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -570,6 +591,18 @@ export default function TeacherContentPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Folder Permissions Dialog */}
+      {permissionsFolderId && (
+        <FolderPermissionsDialog
+          open={permissionsDialogOpen}
+          onOpenChange={setPermissionsDialogOpen}
+          folderId={permissionsFolderId}
+          folderName={allFolders.find(f => f.id === permissionsFolderId)?.name || ""}
+          isRestricted={allFolders.find(f => f.id === permissionsFolderId)?.is_restricted || false}
+          onSave={loadFolders}
+        />
+      )}
     </div>
   )
 }
