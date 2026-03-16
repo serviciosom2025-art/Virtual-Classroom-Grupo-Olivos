@@ -76,11 +76,33 @@ export default function StudentProgressPage() {
   const completedLessons = progress.filter(p => p.status === "completed").length
   const progressPercentage = totalFiles > 0 ? Math.round((completedLessons / totalFiles) * 100) : 0
 
-  const getFileIcon = (type?: string) => {
+  const getFileIcon = (file?: { type?: string; external_url?: string | null; name?: string }) => {
+    const type = file?.type;
+    const url = file?.external_url || "";
+    const name = (file?.name || "").toLowerCase();
+    
+    // Handle Google Drive documents - detect PPT vs PDF
+    if (type === "google_drive_document") {
+      const isPPT = url.includes("/presentation/") || 
+                    url.includes("docs.google.com/presentation") ||
+                    name.endsWith(".pptx") || 
+                    name.endsWith(".ppt");
+      const isPDF = (url.includes("/file/d/") && !isPPT) ||
+                    name.endsWith(".pdf");
+      
+      if (isPPT) {
+        return <Presentation className="h-4 w-4 text-orange-500" />;
+      } else if (isPDF) {
+        return <FileText className="h-4 w-4 text-red-500" />;
+      }
+      return <FileText className="h-4 w-4 text-green-500" />;
+    }
+    
     switch (type) {
-      case "video": return <Video className="h-4 w-4" />
-      case "pdf": return <FileText className="h-4 w-4" />
-      case "powerpoint": return <Presentation className="h-4 w-4" />
+      case "video": return <Video className="h-4 w-4 text-purple-500" />
+      case "external_video": return <Video className="h-4 w-4 text-indigo-500" />
+      case "pdf": return <FileText className="h-4 w-4 text-red-500" />
+      case "powerpoint": return <Presentation className="h-4 w-4 text-orange-500" />
       default: return <BookOpen className="h-4 w-4" />
     }
   }
@@ -183,7 +205,7 @@ export default function StudentProgressPage() {
                     >
                       <div className="flex items-center gap-4">
                         <div className="p-2 bg-muted rounded-lg">
-                          {getFileIcon(item.file?.type)}
+                          {getFileIcon(item.file)}
                         </div>
                         <div>
                           <p className="font-medium">{item.file?.name || "Unknown Lesson"}</p>

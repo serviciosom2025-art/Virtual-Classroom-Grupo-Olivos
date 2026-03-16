@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronRight, Folder, FolderOpen, FileVideo, FileText, FileSpreadsheet, Link2, Lock, CheckCircle } from "lucide-react";
+import { ChevronRight, Folder, FolderOpen, FileVideo, FileText, Presentation, Link2, Lock, CheckCircle } from "lucide-react";
 import type { Folder as FolderType, FileItem } from "@/lib/types";
 
 interface FolderTreeProps {
@@ -60,7 +60,29 @@ export function FolderTree({
 
   const tree = buildTree(null);
 
-  const getFileIcon = (type: string) => {
+  const getFileIcon = (file: FileItem) => {
+    const type = file.type;
+    const url = file.external_url || "";
+    const name = file.name.toLowerCase();
+    
+    // Handle Google Drive documents - detect PPT vs PDF
+    if (type === "google_drive_document") {
+      const isPPT = url.includes("/presentation/") || 
+                    url.includes("docs.google.com/presentation") ||
+                    name.endsWith(".pptx") || 
+                    name.endsWith(".ppt");
+      const isPDF = url.includes("/file/d/") && !isPPT ||
+                    name.endsWith(".pdf");
+      
+      if (isPPT) {
+        return <Presentation className="w-4 h-4 text-orange-500" />;
+      } else if (isPDF) {
+        return <FileText className="w-4 h-4 text-red-500" />;
+      }
+      // Default for Google Drive docs (could be Google Docs, Sheets, etc.)
+      return <FileText className="w-4 h-4 text-green-500" />;
+    }
+    
     switch (type) {
       case "video":
         return <FileVideo className="w-4 h-4 text-purple-500" />;
@@ -69,7 +91,7 @@ export function FolderTree({
       case "pdf":
         return <FileText className="w-4 h-4 text-red-500" />;
       case "powerpoint":
-        return <FileSpreadsheet className="w-4 h-4 text-orange-500" />;
+        return <Presentation className="w-4 h-4 text-orange-500" />;
       default:
         return <FileText className="w-4 h-4 text-slate-500" />;
     }
@@ -132,7 +154,7 @@ export function FolderTree({
                   onClick={() => !locked && onSelectFile(file)}
                   title={locked ? "Complete previous files first" : undefined}
                 >
-                  {getFileIcon(file.type)}
+                  {getFileIcon(file)}
                   <span className="truncate text-sm flex-1">{file.name}</span>
                   {isStudentView && locked && (
                     <Lock className="w-3 h-3 text-amber-500 flex-shrink-0" />
