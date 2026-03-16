@@ -30,6 +30,8 @@ import {
   X,
   ListOrdered,
   FileSpreadsheet,
+  PanelLeftClose,
+  PanelLeft,
 } from "lucide-react";
 import { FolderPermissionsDialog } from "@/components/folders/folder-permissions-dialog";
 import { FileOrderManager } from "@/components/folders/file-order-manager";
@@ -80,6 +82,9 @@ export default function FoldersPage() {
   const [documentLinkOpen, setDocumentLinkOpen] = useState(false);
   const [documentLinkName, setDocumentLinkName] = useState("");
   const [documentLinkUrl, setDocumentLinkUrl] = useState("");
+  
+  // Folder panel collapse state
+  const [folderPanelCollapsed, setFolderPanelCollapsed] = useState(false);
 
   const supabase = createClient();
 
@@ -311,11 +316,13 @@ export default function FoldersPage() {
   return (
     <div className="h-[calc(100vh-8rem)] flex gap-6">
       {/* Sidebar - Folder Tree */}
-      <Card className="w-80 flex-shrink-0 bg-white shadow-sm flex flex-col">
-        <CardHeader className="pb-3 border-b flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Course Materials</CardTitle>
-            <Dialog open={createFolderOpen} onOpenChange={setCreateFolderOpen}>
+      {!folderPanelCollapsed ? (
+        <Card className="w-80 flex-shrink-0 bg-white shadow-sm flex flex-col">
+          <CardHeader className="pb-3 border-b flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">Course Materials</CardTitle>
+              <div className="flex items-center gap-1">
+                <Dialog open={createFolderOpen} onOpenChange={setCreateFolderOpen}>
               <DialogTrigger asChild>
                 <Button size="sm" variant="ghost">
                   <FolderPlus className="w-4 h-4" />
@@ -351,28 +358,51 @@ export default function FoldersPage() {
                   </div>
                 </form>
               </DialogContent>
-            </Dialog>
-          </div>
-        </CardHeader>
-        <CardContent className="flex-1 overflow-auto p-3">
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <Spinner className="w-6 h-6 text-blue-600" />
+                </Dialog>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFolderPanelCollapsed(true)}
+                  title="Collapse folder panel"
+                >
+                  <PanelLeftClose className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
-          ) : (
-            <FolderTree
-              folders={folders}
-              files={files}
-              selectedFolderId={selectedFolderId}
-              selectedFileId={selectedFile?.id || null}
-              onSelectFolder={setSelectedFolderId}
-              onSelectFile={setSelectedFile}
-              expandedFolders={expandedFolders}
-              onToggleFolder={toggleFolder}
-            />
-          )}
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent className="flex-1 overflow-auto p-3">
+            {loading ? (
+              <div className="flex justify-center py-8">
+                <Spinner className="w-6 h-6 text-blue-600" />
+              </div>
+            ) : (
+              <FolderTree
+                folders={folders}
+                files={files}
+                selectedFolderId={selectedFolderId}
+                selectedFileId={selectedFile?.id || null}
+                onSelectFolder={setSelectedFolderId}
+                onSelectFile={setSelectedFile}
+                expandedFolders={expandedFolders}
+                onToggleFolder={toggleFolder}
+              />
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="w-12 flex-shrink-0 bg-white shadow-sm">
+          <CardContent className="p-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setFolderPanelCollapsed(false)}
+              title="Show folder panel"
+            >
+              <PanelLeft className="w-4 h-4" />
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">

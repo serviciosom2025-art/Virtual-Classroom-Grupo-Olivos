@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { FolderTree } from "@/components/folders/folder-tree";
 import { FileViewer } from "@/components/viewers/file-viewer";
-import { X } from "lucide-react";
+import { X, PanelLeftClose, PanelLeft } from "lucide-react";
 import type { Folder, FileItem, StudentProgress, FolderPermission } from "@/lib/types";
 
 export default function StudentCoursesPage() {
@@ -20,6 +20,7 @@ export default function StudentCoursesPage() {
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [folderPanelCollapsed, setFolderPanelCollapsed] = useState(false);
 
   const supabase = createClient();
 
@@ -188,31 +189,56 @@ export default function StudentCoursesPage() {
   return (
     <div className="h-[calc(100vh-8rem)] flex gap-6">
       {/* Sidebar - Folder Tree */}
-      <Card className="w-80 flex-shrink-0 bg-white shadow-sm flex flex-col">
-        <CardHeader className="pb-3 border-b flex-shrink-0">
-          <CardTitle className="text-lg">Course Materials</CardTitle>
-        </CardHeader>
-        <CardContent className="flex-1 overflow-auto p-3">
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <Spinner className="w-6 h-6 text-blue-600" />
+      {!folderPanelCollapsed ? (
+        <Card className="w-80 flex-shrink-0 bg-white shadow-sm flex flex-col">
+          <CardHeader className="pb-3 border-b flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">Course Materials</CardTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setFolderPanelCollapsed(true)}
+                title="Collapse folder panel"
+              >
+                <PanelLeftClose className="w-4 h-4" />
+              </Button>
             </div>
-          ) : (
-            <FolderTree
-              folders={folders}
-              files={files}
-              selectedFolderId={selectedFolderId}
-              selectedFileId={selectedFile?.id || null}
-              onSelectFolder={setSelectedFolderId}
-              onSelectFile={setSelectedFile}
-              expandedFolders={expandedFolders}
-              onToggleFolder={toggleFolder}
-              completedFileIds={new Set(progress.filter(p => p.status === "completed").map(p => p.file_id || ""))}
-              isStudentView={true}
-            />
-          )}
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent className="flex-1 overflow-auto p-3">
+            {loading ? (
+              <div className="flex justify-center py-8">
+                <Spinner className="w-6 h-6 text-blue-600" />
+              </div>
+            ) : (
+              <FolderTree
+                folders={folders}
+                files={files}
+                selectedFolderId={selectedFolderId}
+                selectedFileId={selectedFile?.id || null}
+                onSelectFolder={setSelectedFolderId}
+                onSelectFile={setSelectedFile}
+                expandedFolders={expandedFolders}
+                onToggleFolder={toggleFolder}
+                completedFileIds={new Set(progress.filter(p => p.status === "completed").map(p => p.file_id || ""))}
+                isStudentView={true}
+              />
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="w-12 flex-shrink-0 bg-white shadow-sm">
+          <CardContent className="p-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setFolderPanelCollapsed(false)}
+              title="Show folder panel"
+            >
+              <PanelLeft className="w-4 h-4" />
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main Content - File Viewer */}
       <Card className="flex-1 bg-white shadow-sm overflow-hidden flex flex-col">

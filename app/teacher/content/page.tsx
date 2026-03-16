@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { FolderPlus, Upload, Folder, FileText, Video, Presentation, Trash2, ChevronRight, ChevronDown, Link2, X, Users, Lock, ListOrdered, FileSpreadsheet } from "lucide-react"
+import { FolderPlus, Upload, Folder, FileText, Video, Presentation, Trash2, ChevronRight, ChevronDown, Link2, X, Users, Lock, ListOrdered, FileSpreadsheet, PanelLeftClose, PanelLeft } from "lucide-react"
 import { FileViewer } from "@/components/viewers/file-viewer"
 import { FolderPermissionsDialog } from "@/components/folders/folder-permissions-dialog"
 import { FileOrderManager } from "@/components/folders/file-order-manager"
@@ -59,6 +59,9 @@ export default function TeacherContentPage() {
   // File order dialog state
   const [fileOrderDialogOpen, setFileOrderDialogOpen] = useState(false)
   const [fileOrderFolderId, setFileOrderFolderId] = useState<string | null>(null)
+  
+  // Folder panel collapse state
+  const [folderPanelCollapsed, setFolderPanelCollapsed] = useState(false)
 
   const loadFolders = useCallback(async () => {
     const supabase = createClient()
@@ -681,24 +684,51 @@ export default function TeacherContentPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Folder Structure</CardTitle>
-            <CardDescription>Click on folders to expand and view contents</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {folders.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">
-                No folders yet. Create your first folder to get started.
-              </p>
-            ) : (
-              <div className="space-y-1">{folders.map((folder) => renderFolder(folder))}</div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Folder Structure Panel */}
+        {!folderPanelCollapsed ? (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle>Folder Structure</CardTitle>
+                <CardDescription>Click on folders to expand and view contents</CardDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setFolderPanelCollapsed(true)}
+                title="Collapse folder panel"
+              >
+                <PanelLeftClose className="h-4 w-4" />
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {folders.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">
+                  No folders yet. Create your first folder to get started.
+                </p>
+              ) : (
+                <div className="space-y-1">{folders.map((folder) => renderFolder(folder))}</div>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="h-fit">
+            <CardContent className="py-4 px-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setFolderPanelCollapsed(false)}
+                className="w-full"
+              >
+                <PanelLeft className="h-4 w-4 mr-2" />
+                Show Folders
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* File Preview Panel */}
-        <Card className="lg:sticky lg:top-6 h-fit">
+        <Card className={`lg:sticky lg:top-6 h-fit ${folderPanelCollapsed ? 'lg:col-span-2' : ''}`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div>
               <CardTitle>File Preview</CardTitle>
