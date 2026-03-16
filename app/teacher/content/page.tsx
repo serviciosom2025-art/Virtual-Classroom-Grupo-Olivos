@@ -271,7 +271,7 @@ export default function TeacherContentPage() {
     return (
       <div key={folder.id}>
         <div
-          className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer hover:bg-muted transition-colors ${
+          className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer hover:bg-muted transition-colors group ${
             isSelected ? "bg-muted" : ""
           }`}
           style={{ paddingLeft: `${depth * 16 + 8}px` }}
