@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { FileText, Maximize2, Minimize2, X } from "lucide-react";
+import { createPortal } from "react-dom";
+import { FileText, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface GoogleDriveViewerProps {
@@ -115,43 +116,44 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
     );
   }
 
-  // Fullscreen overlay
-  if (isFullscreen) {
-    return (
-      <div className="fixed inset-0 z-[9999] bg-black flex flex-col">
-        {/* Header with title and collapse button - always on top */}
-        <div className="flex-shrink-0 h-14 bg-slate-900 flex items-center justify-between px-4 border-b border-slate-700">
-          <h3 className="text-white font-medium truncate">{title}</h3>
-          <Button
-            variant="default"
-            size="sm"
-            className="bg-red-600 hover:bg-red-700 text-white border-0 font-medium"
-            onClick={toggleFullscreen}
-          >
-            <Minimize2 className="h-4 w-4 mr-2" />
-            Collapse / Exit
-          </Button>
-        </div>
-        
-        {/* Document container - with overflow hidden to clip Google UI elements */}
-        <div className="flex-1 overflow-hidden relative" style={{ marginRight: "-56px" }}>
-          <iframe
-            src={embedUrl}
-            className="border-0"
-            style={{ 
-              width: "calc(100% + 56px)", 
-              height: "calc(100% + 60px)",
-              marginBottom: "-60px"
-            }}
-            allow="autoplay"
-            title={title}
-          />
-        </div>
+  // Fullscreen overlay - rendered via Portal to escape parent overflow:hidden
+  const fullscreenOverlay = isFullscreen ? createPortal(
+    <div className="fixed inset-0 z-[9999] bg-black flex flex-col">
+      {/* Header with title and collapse button - always on top */}
+      <div className="flex-shrink-0 h-14 bg-slate-900 flex items-center justify-between px-4 border-b border-slate-700">
+        <h3 className="text-white font-medium truncate">{title}</h3>
+        <Button
+          variant="default"
+          size="sm"
+          className="bg-red-600 hover:bg-red-700 text-white border-0 font-medium"
+          onClick={toggleFullscreen}
+        >
+          <Minimize2 className="h-4 w-4 mr-2" />
+          Collapse / Exit
+        </Button>
       </div>
-    );
-  }
+      
+      {/* Document container - with overflow hidden to clip Google UI elements */}
+      <div className="flex-1 overflow-hidden relative" style={{ marginRight: "-56px" }}>
+        <iframe
+          src={embedUrl}
+          className="border-0"
+          style={{ 
+            width: "calc(100% + 56px)", 
+            height: "calc(100% + 60px)",
+            marginBottom: "-60px"
+          }}
+          allow="autoplay"
+          title={title}
+        />
+      </div>
+    </div>,
+    document.body
+  ) : null;
 
   return (
+    <>
+      {fullscreenOverlay}
     <div ref={containerRef} className="h-full w-full bg-slate-900 relative overflow-hidden">
       {/* Expand button */}
       <Button
@@ -181,6 +183,7 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
           title={title}
         />
       </div>
-    </div>
+      </div>
+    </>
   );
 }
