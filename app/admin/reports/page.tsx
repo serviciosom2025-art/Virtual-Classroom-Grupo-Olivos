@@ -32,6 +32,18 @@ interface FileWithFolder {
   folder_id: string | null
 }
 
+interface FolderWithRestriction {
+  id: string
+  name: string
+  parent_id: string | null
+  is_restricted: boolean
+}
+
+interface FolderPermission {
+  folder_id: string
+  student_id: string
+}
+
 interface StudentProgressReport {
   student: Profile
   completedLessons: number
@@ -80,7 +92,8 @@ export default function AdminReportsPage() {
   const [selectedFolderId, setSelectedFolderId] = useState<string>("all")
   const [allFiles, setAllFiles] = useState<FileWithFolder[]>([])
   const [allProgress, setAllProgress] = useState<{student_id: string, file_id: string}[]>([])
-  const [folderMap, setFolderMap] = useState<Map<string, {id: string, name: string, parent_id: string | null}>>(new Map())
+  const [folderMap, setFolderMap] = useState<Map<string, FolderWithRestriction>>(new Map())
+  const [folderPermissions, setFolderPermissions] = useState<FolderPermission[]>([])
 
   useEffect(() => {
     loadReports()
@@ -102,14 +115,23 @@ export default function AdminReportsPage() {
         .from("files")
         .select("id, folder_id")
 
-      // Load all folders
+      // Load all folders with restriction info
       const { data: foldersData } = await supabase
         .from("folders")
-        .select("id, name, parent_id")
+        .select("id, name, parent_id, is_restricted")
         .order("name")
 
+      // Load folder permissions
+      const { data: permissionsData } = await supabase
+        .from("folder_permissions")
+        .select("folder_id, student_id")
+
+      setFolderPermissions(permissionsData || [])
+
       // Build folder map and options
-      const fMap = new Map(foldersData?.map(f => [f.id, f]) || [])
+      const fMap = new Map<string, FolderWithRestriction>(
+        foldersData?.map(f => [f.id, { ...f, is_restricted: f.is_restricted || false }]) || []
+      )
       setFolderMap(fMap)
 
       // Build folder path for each folder
@@ -165,19 +187,38 @@ export default function AdminReportsPage() {
 
       setAllProgress(progressRecords || [])
 
-      // Calculate progress for all files (no folder filter initially)
-      const totalFiles = files?.length || 0
+      // Helper function to get files accessible to a student based on folder permissions
+      function getAccessibleFilesForStudent(studentId: string, allFiles: FileWithFolder[]): FileWithFolder[] {
+        const studentPermissions = (permissionsData || []).filter(p => p.student_id === studentId)
+        const permittedFolderIds = new Set(studentPermissions.map(p => p.folder_id))
+
+        return allFiles.filter(file => {
+          if (!file.folder_id) return true // Files without folder are accessible
+          const folder = fMap.get(file.folder_id)
+          if (!folder) return true // If folder not found, show file
+          // If folder is not restricted, file is accessible
+          // If folder is restricted, check if student has permission
+          return !folder.is_restricted || permittedFolderIds.has(file.folder_id)
+        })
+      }
+
+      // Calculate progress based on each student's accessible files
       const progressData: StudentProgressReport[] = []
       for (const student of students || []) {
+        const accessibleFiles = getAccessibleFilesForStudent(student.id, files || [])
+        const accessibleFileIds = new Set(accessibleFiles.map(f => f.id))
+        
         const completedCount = (progressRecords || []).filter(
-          p => p.student_id === student.id
+          p => p.student_id === student.id && accessibleFileIds.has(p.file_id)
         ).length
+
+        const totalAccessible = accessibleFiles.length
 
         progressData.push({
           student,
           completedLessons: completedCount,
-          totalLessons: totalFiles,
-          progressPercentage: totalFiles ? Math.round((completedCount / totalFiles) * 100) : 0,
+          totalLessons: totalAccessible,
+          progressPercentage: totalAccessible ? Math.round((completedCount / totalAccessible) * 100) : 0,
         })
       }
 
@@ -382,27 +423,44 @@ export default function AdminReportsPage() {
     return descendants
   }
 
-  // Calculate filtered progress based on folder selection
+  // Helper function to get files accessible to a student based on folder permissions
+  function getAccessibleFilesForStudent(studentId: string): FileWithFolder[] {
+    const studentPermissions = folderPermissions.filter(p => p.student_id === studentId)
+    const permittedFolderIds = new Set(studentPermissions.map(p => p.folder_id))
+
+    return allFiles.filter(file => {
+      if (!file.folder_id) return true // Files without folder are accessible
+      const folder = folderMap.get(file.folder_id)
+      if (!folder) return true // If folder not found, show file
+      // If folder is not restricted, file is accessible
+      // If folder is restricted, check if student has permission
+      return !folder.is_restricted || permittedFolderIds.has(file.folder_id)
+    })
+  }
+
+  // Calculate filtered progress based on folder selection AND student permissions
   const filteredProgressByFolder = progressReports.map(report => {
-    if (selectedFolderId === "all") {
-      return report
+    // Get files accessible to this specific student
+    const accessibleFiles = getAccessibleFilesForStudent(report.student.id)
+    
+    let filesToCount = accessibleFiles
+    
+    // If a folder filter is selected, further filter by that folder
+    if (selectedFolderId !== "all") {
+      const includedFolderIds = getDescendantFolderIds(selectedFolderId)
+      filesToCount = accessibleFiles.filter(f => 
+        f.folder_id && includedFolderIds.includes(f.folder_id)
+      )
     }
 
-    // Get all folder IDs that should be included (selected folder + descendants)
-    const includedFolderIds = getDescendantFolderIds(selectedFolderId)
-
-    // Filter files to only those in the selected folder hierarchy
-    const filteredFiles = allFiles.filter(f => 
-      f.folder_id && includedFolderIds.includes(f.folder_id)
-    )
-    const filteredFileIds = new Set(filteredFiles.map(f => f.id))
+    const filteredFileIds = new Set(filesToCount.map(f => f.id))
 
     // Count completed files in the filtered set
     const completedInFolder = allProgress.filter(
       p => p.student_id === report.student.id && filteredFileIds.has(p.file_id)
     ).length
 
-    const totalInFolder = filteredFiles.length
+    const totalInFolder = filesToCount.length
 
     return {
       ...report,
