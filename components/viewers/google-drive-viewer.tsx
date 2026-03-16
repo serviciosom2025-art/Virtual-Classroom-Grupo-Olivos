@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { FileText, Presentation, ExternalLink } from "lucide-react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { FileText, Maximize2, Minimize2, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface GoogleDriveViewerProps {
   url: string;
@@ -11,6 +12,8 @@ interface GoogleDriveViewerProps {
 export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try {
@@ -26,6 +29,21 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
       setError("Invalid Google Drive URL format");
     }
   }, [url]);
+
+  // Handle escape key to exit fullscreen
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [isFullscreen]);
+
+  const toggleFullscreen = useCallback(() => {
+    setIsFullscreen(prev => !prev);
+  }, []);
 
   // Convert various Google Drive URL formats to embeddable preview URL
   function convertGoogleDriveUrl(originalUrl: string): string | null {
@@ -61,17 +79,17 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
 
     // Determine if it's a Google Docs/Slides/Sheets or a regular file
     if (originalUrl.includes("docs.google.com/presentation")) {
-      // Google Slides - use embed URL
-      return `https://docs.google.com/presentation/d/${fileId}/embed?start=false&loop=false&delayms=3000`;
+      // Google Slides - use embed URL with rm=minimal to hide branding
+      return `https://docs.google.com/presentation/d/${fileId}/embed?start=false&loop=false&delayms=3000&rm=minimal`;
     } else if (originalUrl.includes("docs.google.com/document")) {
       // Google Docs - use preview URL
-      return `https://docs.google.com/document/d/${fileId}/preview`;
+      return `https://docs.google.com/document/d/${fileId}/preview?rm=minimal`;
     } else if (originalUrl.includes("docs.google.com/spreadsheets")) {
       // Google Sheets - use preview URL
-      return `https://docs.google.com/spreadsheets/d/${fileId}/preview`;
+      return `https://docs.google.com/spreadsheets/d/${fileId}/preview?rm=minimal`;
     } else {
       // Regular file (PDF, PPTX, etc.) - use preview URL that prevents download
-      return `https://drive.google.com/file/d/${fileId}/preview`;
+      return `https://drive.google.com/file/d/${fileId}/preview?rm=minimal`;
     }
   }
 
@@ -84,15 +102,6 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
           </div>
           <h3 className="text-lg font-medium text-slate-800 mb-2">Unable to Load Document</h3>
           <p className="text-sm text-slate-500 mb-4">{error}</p>
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 text-sm"
-          >
-            <ExternalLink className="w-4 h-4" />
-            Open in Google Drive
-          </a>
         </div>
       </div>
     );
@@ -106,16 +115,60 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
     );
   }
 
+  // Fullscreen overlay
+  if (isFullscreen) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black">
+        {/* Header with title and close button */}
+        <div className="absolute top-0 left-0 right-0 h-12 bg-slate-900/90 backdrop-blur-sm flex items-center justify-between px-4 z-10">
+          <h3 className="text-white font-medium truncate">{title}</h3>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-white hover:bg-white/20"
+            onClick={toggleFullscreen}
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+        
+        {/* Document container - with overflow hidden to clip Google UI elements */}
+        <div className="absolute top-12 left-0 right-0 bottom-0 overflow-hidden">
+          <iframe
+            src={embedUrl}
+            className="w-full h-[calc(100%+60px)] border-0"
+            style={{ marginBottom: "-60px" }}
+            allow="autoplay"
+            title={title}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="h-full w-full bg-slate-900">
-      <iframe
-        src={embedUrl}
-        className="w-full h-full border-0"
-        allow="autoplay"
-        allowFullScreen
-        title={title}
-        sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-      />
+    <div ref={containerRef} className="h-full w-full bg-slate-900 relative">
+      {/* Expand button */}
+      <Button
+        variant="secondary"
+        size="sm"
+        className="absolute top-2 right-2 z-10 bg-slate-800/80 hover:bg-slate-700 text-white border-0"
+        onClick={toggleFullscreen}
+      >
+        <Maximize2 className="h-4 w-4 mr-2" />
+        Expand
+      </Button>
+      
+      {/* Document container - with overflow hidden to clip Google branding */}
+      <div className="w-full h-full overflow-hidden relative">
+        <iframe
+          src={embedUrl}
+          className="w-full h-[calc(100%+60px)] border-0"
+          style={{ marginBottom: "-60px" }}
+          allow="autoplay"
+          title={title}
+        />
+      </div>
     </div>
   );
 }
