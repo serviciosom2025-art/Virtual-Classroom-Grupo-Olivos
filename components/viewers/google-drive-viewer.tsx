@@ -133,19 +133,17 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
         </Button>
       </div>
       
-      {/* Document container - with overflow hidden to clip Google UI elements */}
-      <div className="flex-1 overflow-hidden relative" style={{ marginRight: "-56px" }}>
+      {/* Document container - full width display */}
+      <div className="flex-1 relative">
         <iframe
           src={embedUrl}
-          className="border-0"
-          style={{ 
-            width: "calc(100% + 56px)", 
-            height: "calc(100% + 60px)",
-            marginBottom: "-60px"
-          }}
+          className="w-full h-full border-0"
           allow="autoplay"
+          allowFullScreen
           title={title}
         />
+        {/* Small overlay to cover just the popup icon in top-right */}
+        <div className="absolute top-0 right-0 w-12 h-12 bg-slate-900 pointer-events-none" />
       </div>
     </div>,
     document.body
@@ -154,35 +152,29 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
   return (
     <>
       {fullscreenOverlay}
-    <div ref={containerRef} className="h-full w-full bg-slate-900 relative overflow-hidden">
-      {/* Expand button */}
-      <Button
-        variant="secondary"
-        size="sm"
-        className="absolute top-2 right-2 z-10 bg-slate-800/80 hover:bg-slate-700 text-white border-0"
-        onClick={toggleFullscreen}
-      >
-        <Maximize2 className="h-4 w-4 mr-2" />
-        Expand
-      </Button>
-      
-      {/* Overlay to cover the right side popup icon */}
-      <div className="absolute top-0 right-0 w-14 h-full bg-slate-900 z-[5]" />
-      
-      {/* Document container - with overflow hidden to clip Google branding */}
-      <div className="w-full h-full overflow-hidden relative">
+      <div ref={containerRef} className="h-full w-full bg-slate-900 relative">
+        {/* Expand button */}
+        <Button
+          variant="secondary"
+          size="sm"
+          className="absolute top-2 right-14 z-10 bg-slate-800/80 hover:bg-slate-700 text-white border-0"
+          onClick={toggleFullscreen}
+        >
+          <Maximize2 className="h-4 w-4 mr-2" />
+          Expand
+        </Button>
+        
+        {/* Small overlay to cover just the popup icon in top-right corner */}
+        <div className="absolute top-0 right-0 w-12 h-12 bg-slate-900 z-[5] pointer-events-none" />
+        
+        {/* Document iframe - full size */}
         <iframe
           src={embedUrl}
-          className="border-0"
-          style={{ 
-            width: "calc(100% + 56px)", 
-            height: "calc(100% + 60px)",
-            marginBottom: "-60px"
-          }}
+          className="w-full h-full border-0"
           allow="autoplay"
+          allowFullScreen
           title={title}
         />
-      </div>
       </div>
     </>
   );
