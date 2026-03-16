@@ -37,15 +37,27 @@ export default function StudentExamsPage() {
     }
 
     try {
-      const [examsRes, resultsRes] = await Promise.all([
+      const [examsRes, resultsRes, permissionsRes] = await Promise.all([
         supabase.from("exams").select("*").eq("is_active", true).gt("questions_count", 0).order("title"),
         supabase.from("exam_results").select("*").eq("student_id", user.id),
+        supabase.from("exam_permissions").select("exam_id").eq("student_id", user.id),
       ]);
 
       const examsData = examsRes.data || [];
       const resultsData = resultsRes.data || [];
+      const permissionsData = permissionsRes.data || [];
+      
+      // Filter exams based on permissions
+      const permittedExamIds = new Set(permissionsData.map(p => p.exam_id));
+      
+      const accessibleExams = examsData.filter(exam => {
+        // If exam is not restricted, show it
+        if (!exam.is_restricted) return true;
+        // If exam is restricted, only show if student has permission
+        return permittedExamIds.has(exam.id);
+      });
 
-      const examsWithResults: ExamWithResult[] = examsData.map((exam) => ({
+      const examsWithResults: ExamWithResult[] = accessibleExams.map((exam) => ({
         ...exam,
         result: resultsData.find((r) => r.exam_id === exam.id),
       }));
