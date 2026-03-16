@@ -4,6 +4,7 @@ import { VideoPlayer } from "./video-player";
 import { PDFViewer } from "./pdf-viewer";
 import { PowerPointViewer } from "./powerpoint-viewer";
 import { ExternalVideoPlayer } from "./external-video-player";
+import { GoogleDriveViewer } from "./google-drive-viewer";
 import type { FileItem } from "@/lib/types";
 
 interface FileViewerProps {
@@ -41,6 +42,9 @@ export function FileViewer({ file, showProgress, onMarkComplete, isCompleted, ca
         {file.type === "powerpoint" && <PowerPointViewer url={file.file_url} fileName={file.name} canDownload={canDownload} />}
         {file.type === "external_video" && file.external_url && (
           <ExternalVideoPlayer url={file.external_url} title={file.name} />
+        )}
+        {file.type === "google_drive_document" && file.external_url && (
+          <GoogleDriveViewer url={file.external_url} title={file.name} />
         )}
       </div>
     </div>
