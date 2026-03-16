@@ -29,6 +29,7 @@ import {
   Lock,
   X,
   ListOrdered,
+  FileSpreadsheet,
 } from "lucide-react";
 import { FolderPermissionsDialog } from "@/components/folders/folder-permissions-dialog";
 import { FileOrderManager } from "@/components/folders/file-order-manager";
@@ -74,6 +75,11 @@ export default function FoldersPage() {
   // External link states
   const [externalLinkName, setExternalLinkName] = useState("");
   const [externalLinkUrl, setExternalLinkUrl] = useState("");
+  
+  // Document link states (Google Drive PDFs/PPTs)
+  const [documentLinkOpen, setDocumentLinkOpen] = useState(false);
+  const [documentLinkName, setDocumentLinkName] = useState("");
+  const [documentLinkUrl, setDocumentLinkUrl] = useState("");
 
   const supabase = createClient();
 
@@ -240,6 +246,43 @@ export default function FoldersPage() {
     setFormLoading(false);
   };
 
+  const handleAddDocumentLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!documentLinkName.trim() || !documentLinkUrl.trim() || !selectedFolderId || !user) return;
+
+    // Validate URL is from Google Drive
+    const isGoogleDrive = documentLinkUrl.includes("drive.google.com") || 
+                          documentLinkUrl.includes("docs.google.com");
+
+    if (!isGoogleDrive) {
+      alert("Please enter a valid Google Drive link");
+      return;
+    }
+
+    setFormLoading(true);
+
+    const { error } = await supabase.from("files").insert({
+      name: documentLinkName,
+      type: "google_drive_document",
+      file_url: "",
+      external_url: documentLinkUrl,
+      is_external: true,
+      folder_id: selectedFolderId,
+      uploaded_by: user.id,
+      file_size: 0,
+    });
+
+    if (!error) {
+      setDocumentLinkName("");
+      setDocumentLinkUrl("");
+      setDocumentLinkOpen(false);
+      fetchData();
+    } else {
+      alert("Failed to add document link: " + error.message);
+    }
+    setFormLoading(false);
+  };
+
   const handleDeleteFile = async (fileId: string) => {
     if (!confirm("Are you sure you want to delete this file?")) return;
 
@@ -340,6 +383,64 @@ export default function FoldersPage() {
               <div className="flex items-center gap-2">
                 {selectedFolderId && (
                   <>
+                    <Dialog open={documentLinkOpen} onOpenChange={setDocumentLinkOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" variant="outline">
+                          <FileSpreadsheet className="w-4 h-4 mr-2" />
+                          Add Document Link
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Add Google Drive Document</DialogTitle>
+                          <DialogDescription>
+                            Add a PDF or PowerPoint from Google Drive to: {selectedFolderData?.name}
+                          </DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={handleAddDocumentLink} className="space-y-4 mt-4">
+                          <Field>
+                            <FieldLabel>Document Name</FieldLabel>
+                            <Input
+                              value={documentLinkName}
+                              onChange={(e) => setDocumentLinkName(e.target.value)}
+                              placeholder="Enter a name for this document"
+                              required
+                            />
+                          </Field>
+                          <Field>
+                            <FieldLabel>Google Drive Link</FieldLabel>
+                            <Input
+                              value={documentLinkUrl}
+                              onChange={(e) => setDocumentLinkUrl(e.target.value)}
+                              placeholder="Paste Google Drive sharing link"
+                              required
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Supports: PDFs, PowerPoints, Google Docs, Google Slides
+                            </p>
+                          </Field>
+                          <div className="bg-muted/50 p-3 rounded-lg">
+                            <p className="text-sm font-medium mb-2">How to get the link:</p>
+                            <ul className="text-xs text-muted-foreground space-y-1">
+                              <li>1. Open your file in Google Drive</li>
+                              <li>2. Click Share button (top right)</li>
+                              <li>3. Set access to "Anyone with the link can view"</li>
+                              <li>4. Click "Copy link" and paste it here</li>
+                            </ul>
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <Button type="button" variant="outline" onClick={() => setDocumentLinkOpen(false)}>
+                              Cancel
+                            </Button>
+                            <Button type="submit" disabled={formLoading} className="bg-blue-600 hover:bg-blue-700">
+                              {formLoading && <Spinner className="w-4 h-4 mr-2" />}
+                              Add Document
+                            </Button>
+                          </div>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+
                     <Dialog open={externalLinkOpen} onOpenChange={setExternalLinkOpen}>
                       <DialogTrigger asChild>
                         <Button size="sm" variant="outline">

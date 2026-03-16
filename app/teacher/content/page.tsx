@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { FolderPlus, Upload, Folder, FileText, Video, Presentation, Trash2, ChevronRight, ChevronDown, Link2, X, Users, Lock, ListOrdered } from "lucide-react"
+import { FolderPlus, Upload, Folder, FileText, Video, Presentation, Trash2, ChevronRight, ChevronDown, Link2, X, Users, Lock, ListOrdered, FileSpreadsheet } from "lucide-react"
 import { FileViewer } from "@/components/viewers/file-viewer"
 import { FolderPermissionsDialog } from "@/components/folders/folder-permissions-dialog"
 import { FileOrderManager } from "@/components/folders/file-order-manager"
@@ -44,6 +44,13 @@ export default function TeacherContentPage() {
   const [externalLinkUrl, setExternalLinkUrl] = useState("")
   const [externalLinkFolderId, setExternalLinkFolderId] = useState<string>("")
   const [savingExternalLink, setSavingExternalLink] = useState(false)
+  
+  // Document link states (Google Drive PDFs/PPTs)
+  const [documentLinkDialogOpen, setDocumentLinkDialogOpen] = useState(false)
+  const [documentLinkName, setDocumentLinkName] = useState("")
+  const [documentLinkUrl, setDocumentLinkUrl] = useState("")
+  const [documentLinkFolderId, setDocumentLinkFolderId] = useState<string>("")
+  const [savingDocumentLink, setSavingDocumentLink] = useState(false)
   
   // Permissions dialog state
   const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false)
@@ -238,6 +245,46 @@ export default function TeacherContentPage() {
     setSavingExternalLink(false)
   }
 
+  const handleAddDocumentLink = async () => {
+    if (!documentLinkName.trim() || !documentLinkUrl.trim() || !documentLinkFolderId) return
+
+    // Validate URL is from Google Drive
+    const isGoogleDrive = documentLinkUrl.includes("drive.google.com") || 
+                          documentLinkUrl.includes("docs.google.com")
+
+    if (!isGoogleDrive) {
+      alert("Please enter a valid Google Drive link")
+      return
+    }
+
+    setSavingDocumentLink(true)
+    const supabase = createClient()
+
+    // Create file record for Google Drive document
+    const { error } = await supabase.from("files").insert({
+      name: documentLinkName,
+      type: "google_drive_document",
+      file_url: "",
+      external_url: documentLinkUrl,
+      is_external: true,
+      folder_id: documentLinkFolderId,
+      uploaded_by: user!.id,
+      file_size: 0,
+    })
+
+    if (!error) {
+      setDocumentLinkName("")
+      setDocumentLinkUrl("")
+      setDocumentLinkFolderId("")
+      setDocumentLinkDialogOpen(false)
+      loadFolders()
+    } else {
+      alert("Failed to add document link: " + error.message)
+    }
+
+    setSavingDocumentLink(false)
+  }
+
   const handleDeleteFolder = async (folderId: string) => {
     if (!confirm("Are you sure you want to delete this folder and all its contents?")) return
 
@@ -264,6 +311,8 @@ export default function TeacherContentPage() {
         return <FileText className="h-4 w-4 text-red-500" />
       case "powerpoint":
         return <Presentation className="h-4 w-4 text-orange-500" />
+      case "google_drive_document":
+        return <FileSpreadsheet className="h-4 w-4 text-green-500" />
       default:
         return <FileText className="h-4 w-4" />
     }
@@ -430,6 +479,79 @@ export default function TeacherContentPage() {
                   Cancel
                 </Button>
                 <Button onClick={handleCreateFolder}>Create Folder</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={documentLinkDialogOpen} onOpenChange={setDocumentLinkDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Add Document Link
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add Google Drive Document</DialogTitle>
+                <DialogDescription>
+                  Add a PDF or PowerPoint from Google Drive. Students can view but not download.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <Field>
+                  <FieldLabel>Document Name</FieldLabel>
+                  <Input
+                    value={documentLinkName}
+                    onChange={(e) => setDocumentLinkName(e.target.value)}
+                    placeholder="Enter a name for this document"
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel>Google Drive Link</FieldLabel>
+                  <Input
+                    value={documentLinkUrl}
+                    onChange={(e) => setDocumentLinkUrl(e.target.value)}
+                    placeholder="Paste Google Drive sharing link"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Supports: PDFs, PowerPoints, Google Docs, Google Slides
+                  </p>
+                </Field>
+                <Field>
+                  <FieldLabel>Select Folder</FieldLabel>
+                  <Select value={documentLinkFolderId} onValueChange={setDocumentLinkFolderId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select folder" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allFolders.map((f) => (
+                        <SelectItem key={f.id} value={f.id}>
+                          {f.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <div className="bg-muted/50 p-3 rounded-lg">
+                  <p className="text-sm font-medium mb-2">How to get the link:</p>
+                  <ul className="text-xs text-muted-foreground space-y-1">
+                    <li>1. Open your file in Google Drive</li>
+                    <li>2. Click Share button (top right)</li>
+                    <li>3. Set access to "Anyone with the link can view"</li>
+                    <li>4. Click "Copy link" and paste it here</li>
+                  </ul>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDocumentLinkDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleAddDocumentLink} 
+                  disabled={savingDocumentLink || !documentLinkName || !documentLinkUrl || !documentLinkFolderId}
+                >
+                  {savingDocumentLink ? "Adding..." : "Add Document"}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
