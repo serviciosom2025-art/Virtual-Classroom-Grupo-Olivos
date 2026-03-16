@@ -28,6 +28,21 @@ interface StudentData {
   avgScore: number;
 }
 
+interface FolderWithRestriction {
+  id: string;
+  is_restricted: boolean;
+}
+
+interface FileWithFolder {
+  id: string;
+  folder_id: string | null;
+}
+
+interface FolderPermission {
+  folder_id: string;
+  student_id: string;
+}
+
 export default function TeacherStudentsPage() {
   const [students, setStudents] = useState<StudentData[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<StudentData[]>([]);
@@ -46,19 +61,47 @@ export default function TeacherStudentsPage() {
         .eq("role", "student")
         .order("full_name");
 
-      // Fetch total files count
-      const { count: filesCount } = await supabase.from("files").select("id", { count: "exact" });
-      setTotalFiles(filesCount || 0);
-
-      // Fetch all progress and results
-      const [progressRes, resultsRes] = await Promise.all([
+      // Fetch files, folders, and folder permissions for permission-based filtering
+      const [filesRes, foldersRes, permissionsRes, progressRes, resultsRes] = await Promise.all([
+        supabase.from("files").select("id, folder_id"),
+        supabase.from("folders").select("id, is_restricted"),
+        supabase.from("folder_permissions").select("folder_id, student_id"),
         supabase.from("student_progress").select("*").eq("status", "completed"),
         supabase.from("exam_results").select("*"),
       ]);
 
-      const progressByStudent = new Map<string, number>();
+      const allFiles: FileWithFolder[] = filesRes.data || [];
+      const folders: FolderWithRestriction[] = foldersRes.data || [];
+      const folderPermissions: FolderPermission[] = permissionsRes.data || [];
+      
+      // Create folder map for quick lookups
+      const folderMap = new Map(folders.map(f => [f.id, f]));
+      
+      // Set total files for display (max possible)
+      setTotalFiles(allFiles.length);
+
+      // Helper function to get files accessible to a specific student
+      const getAccessibleFilesForStudent = (studentId: string): FileWithFolder[] => {
+        const studentPermissions = folderPermissions.filter(p => p.student_id === studentId);
+        const permittedFolderIds = new Set(studentPermissions.map(p => p.folder_id));
+
+        return allFiles.filter(file => {
+          if (!file.folder_id) return true; // Files without folder are accessible
+          const folder = folderMap.get(file.folder_id);
+          if (!folder) return true; // If folder not found, show file
+          // If folder is not restricted, file is accessible
+          // If folder is restricted, check if student has permission
+          return !folder.is_restricted || permittedFolderIds.has(file.folder_id);
+        });
+      };
+
+      // Count completed files per student (only counting files they can access)
+      const progressByStudent = new Map<string, Set<string>>();
       (progressRes.data || []).forEach((p) => {
-        progressByStudent.set(p.student_id, (progressByStudent.get(p.student_id) || 0) + 1);
+        if (!progressByStudent.has(p.student_id)) {
+          progressByStudent.set(p.student_id, new Set());
+        }
+        progressByStudent.get(p.student_id)!.add(p.file_id);
       });
 
       const resultsByStudent = new Map<string, { count: number; totalScore: number }>();
@@ -72,13 +115,20 @@ export default function TeacherStudentsPage() {
 
       const enrichedStudents: StudentData[] = (studentsData || []).map((student) => {
         const results = resultsByStudent.get(student.id);
+        const accessibleFiles = getAccessibleFilesForStudent(student.id);
+        const accessibleFileIds = new Set(accessibleFiles.map(f => f.id));
+        const completedFileIds = progressByStudent.get(student.id) || new Set();
+        
+        // Only count completed files that the student can actually access
+        const completedAccessibleCount = [...completedFileIds].filter(id => accessibleFileIds.has(id)).length;
+        
         return {
           id: student.id,
           full_name: student.full_name || "Unknown",
           email: student.email || "",
           created_at: student.created_at,
-          completedFiles: progressByStudent.get(student.id) || 0,
-          totalFiles: filesCount || 0,
+          completedFiles: completedAccessibleCount,
+          totalFiles: accessibleFiles.length,
           examsCompleted: results?.count || 0,
           avgScore: results ? Math.round(results.totalScore / results.count) : 0,
         };
@@ -120,12 +170,14 @@ export default function TeacherStudentsPage() {
     );
   }
 
-  // Stats
+  // Stats - calculate average progress based on each student's individual accessible files
   const avgProgress =
-    students.length > 0 && totalFiles > 0
+    students.length > 0
       ? Math.round(
-          students.reduce((acc, s) => acc + (s.completedFiles / totalFiles) * 100, 0) /
-            students.length
+          students.reduce((acc, s) => {
+            const studentProgress = s.totalFiles > 0 ? (s.completedFiles / s.totalFiles) * 100 : 0;
+            return acc + studentProgress;
+          }, 0) / students.length
         )
       : 0;
 
@@ -241,8 +293,8 @@ export default function TeacherStudentsPage() {
               <TableBody>
                 {filteredStudents.map((student) => {
                   const progressPercent =
-                    totalFiles > 0
-                      ? Math.round((student.completedFiles / totalFiles) * 100)
+                    student.totalFiles > 0
+                      ? Math.round((student.completedFiles / student.totalFiles) * 100)
                       : 0;
 
                   return (
@@ -264,7 +316,7 @@ export default function TeacherStudentsPage() {
                         <div className="w-32">
                           <div className="flex items-center justify-between text-sm mb-1">
                             <span className="text-slate-500">
-                              {student.completedFiles}/{totalFiles}
+                              {student.completedFiles}/{student.totalFiles}
                             </span>
                             <span className="font-medium">{progressPercent}%</span>
                           </div>
