@@ -70,6 +70,7 @@ export default function ExamsPage() {
     folder_id: "",
     max_attempts: 3,
     time_limit: 30,
+    questions_to_show: 10,
     randomize_questions: true,
     randomize_answers: true,
   });
@@ -101,10 +102,15 @@ export default function ExamsPage() {
     setFormLoading(true);
 
     const { error } = await supabase.from("exams").insert({
-      ...newExam,
+      title: newExam.title,
+      description: newExam.description,
       folder_id: newExam.folder_id || null,
       created_by: user.id,
-      questions_count: 0,
+      max_attempts: newExam.max_attempts,
+      time_limit: newExam.time_limit,
+      questions_count: newExam.questions_to_show,
+      randomize_questions: newExam.randomize_questions,
+      randomize_answers: newExam.randomize_answers,
       is_active: true,
     });
 
@@ -115,6 +121,7 @@ export default function ExamsPage() {
         folder_id: "",
         max_attempts: 3,
         time_limit: 30,
+        questions_to_show: 10,
         randomize_questions: true,
         randomize_answers: true,
       });
@@ -277,18 +284,30 @@ export default function ExamsPage() {
                   />
                 </Field>
                 <Field>
-                  <FieldLabel>Time Limit (minutes)</FieldLabel>
+                  <FieldLabel>Questions to Show</FieldLabel>
                   <Input
                     type="number"
-                    min={5}
-                    max={180}
-                    value={newExam.time_limit}
+                    min={1}
+                    value={newExam.questions_to_show}
                     onChange={(e) =>
-                      setNewExam({ ...newExam, time_limit: parseInt(e.target.value) || 30 })
+                      setNewExam({ ...newExam, questions_to_show: parseInt(e.target.value) || 1 })
                     }
                   />
                 </Field>
               </div>
+
+              <Field>
+                <FieldLabel>Time Limit (minutes)</FieldLabel>
+                <Input
+                  type="number"
+                  min={5}
+                  max={180}
+                  value={newExam.time_limit}
+                  onChange={(e) =>
+                    setNewExam({ ...newExam, time_limit: parseInt(e.target.value) || 30 })
+                  }
+                />
+              </Field>
 
               <div className="flex flex-col gap-3">
                 <div className="flex items-center gap-3">
