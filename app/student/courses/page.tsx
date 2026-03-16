@@ -117,7 +117,7 @@ export default function StudentCoursesPage() {
     try {
       const [foldersRes, filesRes, progressRes, permissionsRes] = await Promise.all([
         supabase.from("folders").select("*").order("name"),
-        supabase.from("files").select("*").order("name"),
+        supabase.from("files").select("*").order("position, name"),
         supabase.from("student_progress").select("*").eq("student_id", user.id),
         supabase.from("folder_permissions").select("*").eq("student_id", user.id),
       ]);
@@ -207,6 +207,8 @@ export default function StudentCoursesPage() {
               onSelectFile={setSelectedFile}
               expandedFolders={expandedFolders}
               onToggleFolder={toggleFolder}
+              completedFileIds={new Set(progress.filter(p => p.status === "completed").map(p => p.file_id || ""))}
+              isStudentView={true}
             />
           )}
         </CardContent>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronRight, Folder, FolderOpen, FileVideo, FileText, FileSpreadsheet, Link2 } from "lucide-react";
+import { ChevronRight, Folder, FolderOpen, FileVideo, FileText, FileSpreadsheet, Link2, Lock, CheckCircle } from "lucide-react";
 import type { Folder as FolderType, FileItem } from "@/lib/types";
 
 interface FolderTreeProps {
@@ -14,6 +14,8 @@ interface FolderTreeProps {
   onSelectFile: (file: FileItem) => void;
   expandedFolders: Set<string>;
   onToggleFolder: (folderId: string) => void;
+  completedFileIds?: Set<string>;
+  isStudentView?: boolean;
 }
 
 export function FolderTree({
@@ -25,6 +27,8 @@ export function FolderTree({
   onSelectFile,
   expandedFolders,
   onToggleFolder,
+  completedFileIds = new Set(),
+  isStudentView = false,
 }: FolderTreeProps) {
   // Build folder hierarchy
   const buildTree = (parentId: string | null): FolderType[] => {
@@ -33,8 +37,25 @@ export function FolderTree({
       .map((folder) => ({
         ...folder,
         children: buildTree(folder.id),
-        files: files.filter((f) => f.folder_id === folder.id),
+        files: files
+          .filter((f) => f.folder_id === folder.id)
+          .sort((a, b) => (a.position || 0) - (b.position || 0)),
       }));
+  };
+
+  // Check if a file is locked due to sequential order
+  const isFileLocked = (folder: FolderType, fileIndex: number): boolean => {
+    if (!isStudentView || !folder.sequential_order) return false;
+    if (!folder.files || folder.files.length === 0) return false;
+    
+    // Check if all previous files are completed
+    for (let i = 0; i < fileIndex; i++) {
+      const prevFile = folder.files[i];
+      if (!completedFileIds.has(prevFile.id)) {
+        return true; // Previous file not completed, this one is locked
+      }
+    }
+    return false;
   };
 
   const tree = buildTree(null);
@@ -95,20 +116,33 @@ export function FolderTree({
         {isExpanded && (
           <div>
             {folder.children?.map((child) => renderFolder(child, depth + 1))}
-            {folder.files?.map((file) => (
-              <div
-                key={file.id}
-                className={cn(
-                  "flex items-center gap-2 py-1.5 px-2 rounded-md cursor-pointer transition-colors",
-                  selectedFileId === file.id ? "bg-blue-100 text-blue-700" : "hover:bg-slate-100"
-                )}
-                style={{ paddingLeft: `${(depth + 1) * 16 + 24}px` }}
-                onClick={() => onSelectFile(file)}
-              >
-                {getFileIcon(file.type)}
-                <span className="truncate text-sm">{file.name}</span>
-              </div>
-            ))}
+            {folder.files?.map((file, fileIndex) => {
+              const locked = isFileLocked(folder, fileIndex);
+              const completed = completedFileIds.has(file.id);
+              
+              return (
+                <div
+                  key={file.id}
+                  className={cn(
+                    "flex items-center gap-2 py-1.5 px-2 rounded-md transition-colors",
+                    locked ? "opacity-60 cursor-not-allowed" : "cursor-pointer",
+                    selectedFileId === file.id ? "bg-blue-100 text-blue-700" : locked ? "" : "hover:bg-slate-100"
+                  )}
+                  style={{ paddingLeft: `${(depth + 1) * 16 + 24}px` }}
+                  onClick={() => !locked && onSelectFile(file)}
+                  title={locked ? "Complete previous files first" : undefined}
+                >
+                  {getFileIcon(file.type)}
+                  <span className="truncate text-sm flex-1">{file.name}</span>
+                  {isStudentView && locked && (
+                    <Lock className="w-3 h-3 text-amber-500 flex-shrink-0" />
+                  )}
+                  {isStudentView && completed && !locked && (
+                    <CheckCircle className="w-3 h-3 text-emerald-500 flex-shrink-0" />
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

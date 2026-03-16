@@ -18,6 +18,7 @@ export interface Folder {
   created_at: string;
   updated_at: string;
   is_restricted?: boolean;
+  sequential_order?: boolean;
   children?: Folder[];
   files?: FileItem[];
   exams?: Exam[];
@@ -42,6 +43,7 @@ export interface FileItem {
   updated_at: string;
   external_url?: string | null;
   is_external?: boolean;
+  position?: number;
 }
 
 export interface StudentProgress {
