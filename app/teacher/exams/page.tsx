@@ -12,7 +12,7 @@ import { Field, FieldLabel } from "@/components/ui/field"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Plus, Edit, Trash2, FileQuestion, Settings, Users, Lock } from "lucide-react"
+import { Plus, Edit, Trash2, FileQuestion, Settings, Users, Lock, Copy, Pencil } from "lucide-react"
 import Link from "next/link"
 import { ExamPermissionsDialog } from "@/components/exams/exam-permissions-dialog"
 import type { Exam, Folder } from "@/lib/types"
@@ -30,6 +30,9 @@ export default function TeacherExamsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false)
   const [selectedExamForPermissions, setSelectedExamForPermissions] = useState<ExamWithDetails | null>(null)
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false)
+  const [examToRename, setExamToRename] = useState<ExamWithDetails | null>(null)
+  const [newTitle, setNewTitle] = useState("")
   
   const [newExam, setNewExam] = useState({
     title: "",
@@ -123,6 +126,71 @@ export default function TeacherExamsPage() {
       .update({ is_active: !isActive })
       .eq("id", examId)
     loadExams()
+  }
+
+  const handleDuplicateExam = async (exam: ExamWithDetails) => {
+    if (!user) return
+    const supabase = createClient()
+
+    // Get questions for this exam
+    const { data: questions } = await supabase
+      .from("questions")
+      .select("*")
+      .eq("exam_id", exam.id)
+
+    // Create new exam
+    const { data: newExamData, error: examError } = await supabase
+      .from("exams")
+      .insert({
+        title: `${exam.title} (Copy)`,
+        description: exam.description,
+        folder_id: exam.folder_id,
+        created_by: user.id,
+        max_attempts: exam.max_attempts,
+        questions_count: exam.questions_count,
+        randomize_questions: exam.randomize_questions,
+        randomize_answers: exam.randomize_answers,
+        time_limit: exam.time_limit,
+        is_active: false,
+      })
+      .select()
+      .single()
+
+    if (examError || !newExamData) return
+
+    // Duplicate questions
+    if (questions && questions.length > 0) {
+      const newQuestions = questions.map((q) => ({
+        exam_id: newExamData.id,
+        question: q.question,
+        option_a: q.option_a,
+        option_b: q.option_b,
+        option_c: q.option_c,
+        option_d: q.option_d,
+        correct_answer: q.correct_answer,
+      }))
+
+      await supabase.from("questions").insert(newQuestions)
+    }
+
+    loadExams()
+  }
+
+  const handleRenameExam = async () => {
+    if (!examToRename || !newTitle.trim()) return
+    const supabase = createClient()
+
+    const { error } = await supabase
+      .from("exams")
+      .update({ title: newTitle.trim() })
+      .eq("id", examToRename.id)
+
+    if (!error) {
+      setRenameDialogOpen(false)
+      setExamToRename(null)
+      setNewTitle("")
+      loadExams()
+    }
   }
 
   if (loading) {
@@ -290,6 +358,26 @@ export default function TeacherExamsPage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    title="Rename"
+                    onClick={() => {
+                      setExamToRename(exam)
+                      setNewTitle(exam.title)
+                      setRenameDialogOpen(true)
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    title="Duplicate"
+                    onClick={() => handleDuplicateExam(exam)}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     title="Manage Access"
                     onClick={() => {
                       setSelectedExamForPermissions(exam)
@@ -301,6 +389,7 @@ export default function TeacherExamsPage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    title="Toggle Active"
                     onClick={() => handleToggleActive(exam.id, exam.is_active)}
                   >
                     <Settings className="h-4 w-4" />
@@ -308,6 +397,7 @@ export default function TeacherExamsPage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    title="Delete"
                     onClick={() => handleDeleteExam(exam.id)}
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
@@ -330,6 +420,34 @@ export default function TeacherExamsPage() {
           onSave={loadExams}
         />
       )}
+
+      {/* Rename Exam Dialog */}
+      <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Exam</DialogTitle>
+            <DialogDescription>Enter a new name for this exam</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Field>
+              <FieldLabel>Exam Title</FieldLabel>
+              <Input
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                placeholder="Enter exam title"
+              />
+            </Field>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleRenameExam} disabled={!newTitle.trim()}>
+              Rename
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

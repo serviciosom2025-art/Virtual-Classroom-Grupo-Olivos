@@ -48,10 +48,10 @@ import {
   FileEdit,
   Trash2,
   Copy,
-  Eye,
   ClipboardList,
   Users,
   Lock,
+  Pencil,
 } from "lucide-react";
 import type { Exam, Folder } from "@/lib/types";
 import Link from "next/link";
@@ -67,6 +67,9 @@ export default function ExamsPage() {
   const [formLoading, setFormLoading] = useState(false);
   const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
   const [selectedExamForPermissions, setSelectedExamForPermissions] = useState<Exam | null>(null);
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [examToRename, setExamToRename] = useState<Exam | null>(null);
+  const [newTitle, setNewTitle] = useState("");
 
   // Form state
   const [newExam, setNewExam] = useState({
@@ -152,6 +155,22 @@ export default function ExamsPage() {
       .eq("id", exam.id);
 
     if (!error) {
+      fetchData();
+    }
+  };
+
+  const handleRenameExam = async () => {
+    if (!examToRename || !newTitle.trim()) return;
+
+    const { error } = await supabase
+      .from("exams")
+      .update({ title: newTitle.trim() })
+      .eq("id", examToRename.id);
+
+    if (!error) {
+      setRenameDialogOpen(false);
+      setExamToRename(null);
+      setNewTitle("");
       fetchData();
     }
   };
@@ -424,11 +443,15 @@ export default function ExamsPage() {
                               Edit Questions
                             </Link>
                           </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <Link href={`/admin/exams/${exam.id}/results`}>
-                              <Eye className="w-4 h-4 mr-2" />
-                              View Results
-                            </Link>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setExamToRename(exam);
+                              setNewTitle(exam.title);
+                              setRenameDialogOpen(true);
+                            }}
+                          >
+                            <Pencil className="w-4 h-4 mr-2" />
+                            Rename
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => {
@@ -476,6 +499,34 @@ export default function ExamsPage() {
           onSave={fetchData}
         />
       )}
+
+      {/* Rename Exam Dialog */}
+      <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Exam</DialogTitle>
+            <DialogDescription>Enter a new name for this exam</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Field>
+              <FieldLabel>Exam Title</FieldLabel>
+              <Input
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                placeholder="Enter exam title"
+              />
+            </Field>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setRenameDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleRenameExam} disabled={!newTitle.trim()}>
+              Rename
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
