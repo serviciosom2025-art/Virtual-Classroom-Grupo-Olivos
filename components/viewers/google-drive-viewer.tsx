@@ -118,23 +118,23 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
   // Fullscreen overlay
   if (isFullscreen) {
     return (
-      <div className="fixed inset-0 z-50 bg-black">
-        {/* Header with title and collapse button */}
-        <div className="absolute top-0 left-0 right-0 h-12 bg-slate-900/90 backdrop-blur-sm flex items-center justify-between px-4 z-10">
+      <div className="fixed inset-0 z-[9999] bg-black flex flex-col">
+        {/* Header with title and collapse button - always on top */}
+        <div className="flex-shrink-0 h-14 bg-slate-900 flex items-center justify-between px-4 border-b border-slate-700">
           <h3 className="text-white font-medium truncate">{title}</h3>
           <Button
-            variant="secondary"
+            variant="default"
             size="sm"
-            className="bg-slate-700 hover:bg-slate-600 text-white border-0"
+            className="bg-red-600 hover:bg-red-700 text-white border-0 font-medium"
             onClick={toggleFullscreen}
           >
             <Minimize2 className="h-4 w-4 mr-2" />
-            Collapse
+            Collapse / Exit
           </Button>
         </div>
         
         {/* Document container - with overflow hidden to clip Google UI elements */}
-        <div className="absolute top-12 left-0 bottom-0 overflow-hidden" style={{ right: "-56px" }}>
+        <div className="flex-1 overflow-hidden relative" style={{ marginRight: "-56px" }}>
           <iframe
             src={embedUrl}
             className="border-0"
