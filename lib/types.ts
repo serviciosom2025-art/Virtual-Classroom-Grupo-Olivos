@@ -18,6 +18,7 @@ export interface Folder {
   created_at: string;
   updated_at: string;
   is_restricted?: boolean;
+  is_teacher_restricted?: boolean;
   sequential_order?: boolean;
   children?: Folder[];
   files?: FileItem[];

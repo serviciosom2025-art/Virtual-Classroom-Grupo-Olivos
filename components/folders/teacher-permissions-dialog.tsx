@@ -15,9 +15,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Spinner } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Users, Search, Eye, Pencil } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Users, Search, Eye, Pencil, Globe, Lock } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Profile } from "@/lib/types";
 
 interface TeacherPermission {
@@ -31,6 +32,7 @@ interface TeacherPermissionsDialogProps {
   onOpenChange: (open: boolean) => void;
   folderId: string;
   folderName: string;
+  isTeacherRestricted?: boolean;
   onSave: () => void;
 }
 
@@ -39,6 +41,7 @@ export function TeacherPermissionsDialog({
   onOpenChange,
   folderId,
   folderName,
+  isTeacherRestricted = false,
   onSave,
 }: TeacherPermissionsDialogProps) {
   const [teachers, setTeachers] = useState<Profile[]>([]);
@@ -46,14 +49,16 @@ export function TeacherPermissionsDialog({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [restricted, setRestricted] = useState(isTeacherRestricted);
 
   const supabase = createClient();
 
   useEffect(() => {
     if (open) {
+      setRestricted(isTeacherRestricted);
       fetchData();
     }
-  }, [open, folderId]);
+  }, [open, folderId, isTeacherRestricted]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -175,24 +180,32 @@ export function TeacherPermissionsDialog({
   const handleSave = async () => {
     setSaving(true);
 
+    // Update the folder's is_teacher_restricted status
+    await supabase
+      .from("folders")
+      .update({ is_teacher_restricted: restricted })
+      .eq("id", folderId);
+
     // Delete existing permissions for this folder
     await supabase
       .from("teacher_folder_permissions")
       .delete()
       .eq("folder_id", folderId);
 
-    // Insert new permissions
-    const permissionsToInsert = Array.from(permissions.values())
-      .filter((p) => p.can_view || p.can_edit)
-      .map((p) => ({
-        folder_id: folderId,
-        teacher_id: p.teacher_id,
-        can_view: p.can_view,
-        can_edit: p.can_edit,
-      }));
+    // Only insert specific permissions if restricted
+    if (restricted) {
+      const permissionsToInsert = Array.from(permissions.values())
+        .filter((p) => p.can_view || p.can_edit)
+        .map((p) => ({
+          folder_id: folderId,
+          teacher_id: p.teacher_id,
+          can_view: p.can_view,
+          can_edit: p.can_edit,
+        }));
 
-    if (permissionsToInsert.length > 0) {
-      await supabase.from("teacher_folder_permissions").insert(permissionsToInsert);
+      if (permissionsToInsert.length > 0) {
+        await supabase.from("teacher_folder_permissions").insert(permissionsToInsert);
+      }
     }
 
     setSaving(false);
@@ -228,29 +241,57 @@ export function TeacherPermissionsDialog({
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Summary Badges */}
-            <div className="flex items-center gap-3">
-              <Badge variant="outline" className="gap-1">
-                <Eye className="w-3 h-3" />
-                {viewCount} can view
-              </Badge>
-              <Badge variant="outline" className="gap-1">
-                <Pencil className="w-3 h-3" />
-                {editCount} can edit
-              </Badge>
+            {/* Restricted Toggle */}
+            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border">
+              <div className="flex items-center gap-3">
+                {restricted ? (
+                  <Lock className="w-5 h-5 text-amber-500" />
+                ) : (
+                  <Globe className="w-5 h-5 text-green-500" />
+                )}
+                <div>
+                  <Label className="text-base font-medium">
+                    {restricted ? "Restricted Access" : "Public Access"}
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    {restricted
+                      ? "Only selected teachers can access this folder"
+                      : "All teachers can view and edit this folder"}
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={restricted}
+                onCheckedChange={setRestricted}
+              />
             </div>
 
-            {/* Info Box */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
-              <p className="text-blue-800">
-                <strong>View:</strong> Teacher can see this folder and its files.
-                <br />
-                <strong>Edit:</strong> Teacher can add, modify, or delete files in this folder.
-              </p>
-              <p className="text-blue-600 mt-1 text-xs">
-                Note: Teachers without any permissions will not see this folder.
-              </p>
-            </div>
+            {/* Only show teacher selection when restricted */}
+            {restricted && (
+              <>
+                {/* Summary Badges */}
+                <div className="flex items-center gap-3">
+                  <Badge variant="outline" className="gap-1">
+                    <Eye className="w-3 h-3" />
+                    {viewCount} can view
+                  </Badge>
+                  <Badge variant="outline" className="gap-1">
+                    <Pencil className="w-3 h-3" />
+                    {editCount} can edit
+                  </Badge>
+                </div>
+
+                {/* Info Box */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
+                  <p className="text-blue-800">
+                    <strong>View:</strong> Teacher can see this folder and its files.
+                    <br />
+                    <strong>Edit:</strong> Teacher can add, modify, or delete files in this folder.
+                  </p>
+                  <p className="text-blue-600 mt-1 text-xs">
+                    Note: Teachers without any permissions will not see this folder.
+                  </p>
+                </div>
 
             {/* Search */}
             <div className="relative">
@@ -326,6 +367,8 @@ export function TeacherPermissionsDialog({
                 </div>
               )}
             </ScrollArea>
+              </>
+            )}
           </div>
         )}
 

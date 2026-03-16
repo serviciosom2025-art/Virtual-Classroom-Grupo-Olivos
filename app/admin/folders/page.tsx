@@ -719,6 +719,7 @@ export default function FoldersPage() {
           onOpenChange={setTeacherPermissionsDialogOpen}
           folderId={selectedFolderId}
           folderName={selectedFolderData.name}
+          isTeacherRestricted={selectedFolderData.is_teacher_restricted || false}
           onSave={fetchData}
         />
       )}
