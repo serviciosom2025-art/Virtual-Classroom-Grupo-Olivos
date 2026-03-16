@@ -32,8 +32,10 @@ import {
   FileSpreadsheet,
   PanelLeftClose,
   PanelLeft,
+  GraduationCap,
 } from "lucide-react";
 import { FolderPermissionsDialog } from "@/components/folders/folder-permissions-dialog";
+import { TeacherPermissionsDialog } from "@/components/folders/teacher-permissions-dialog";
 import { FileOrderManager } from "@/components/folders/file-order-manager";
 import {
   DropdownMenu,
@@ -65,6 +67,7 @@ export default function FoldersPage() {
   const [editFolderOpen, setEditFolderOpen] = useState(false);
   const [externalLinkOpen, setExternalLinkOpen] = useState(false);
   const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
+  const [teacherPermissionsDialogOpen, setTeacherPermissionsDialogOpen] = useState(false);
   const [fileOrderDialogOpen, setFileOrderDialogOpen] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
 
@@ -599,12 +602,16 @@ export default function FoldersPage() {
                           <Edit2 className="w-4 h-4 mr-2" />
                           Rename Folder
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setPermissionsDialogOpen(true)}>
+<DropdownMenuItem onClick={() => setPermissionsDialogOpen(true)}>
                           <Users className="w-4 h-4 mr-2" />
-                          Manage Access
+                          Student Access
                           {selectedFolderData?.is_restricted && (
                             <Lock className="w-3 h-3 ml-2 text-amber-500" />
                           )}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setTeacherPermissionsDialogOpen(true)}>
+                          <GraduationCap className="w-4 h-4 mr-2" />
+                          Teacher Access
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setFileOrderDialogOpen(true)}>
                           <ListOrdered className="w-4 h-4 mr-2" />
@@ -693,7 +700,7 @@ export default function FoldersPage() {
         </Card>
       </div>
 
-      {/* Folder Permissions Dialog */}
+      {/* Folder Permissions Dialog (Students) */}
       {selectedFolderId && selectedFolderData && (
         <FolderPermissionsDialog
           open={permissionsDialogOpen}
@@ -701,6 +708,17 @@ export default function FoldersPage() {
           folderId={selectedFolderId}
           folderName={selectedFolderData.name}
           isRestricted={selectedFolderData.is_restricted || false}
+          onSave={fetchData}
+        />
+      )}
+
+      {/* Teacher Permissions Dialog */}
+      {selectedFolderId && selectedFolderData && (
+        <TeacherPermissionsDialog
+          open={teacherPermissionsDialogOpen}
+          onOpenChange={setTeacherPermissionsDialogOpen}
+          folderId={selectedFolderId}
+          folderName={selectedFolderData.name}
           onSave={fetchData}
         />
       )}

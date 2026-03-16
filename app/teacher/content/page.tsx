@@ -62,9 +62,35 @@ export default function TeacherContentPage() {
   
   // Folder panel collapse state
   const [folderPanelCollapsed, setFolderPanelCollapsed] = useState(false)
+  
+  // Teacher permissions
+  const [viewableFolderIds, setViewableFolderIds] = useState<Set<string>>(new Set())
+  const [editableFolderIds, setEditableFolderIds] = useState<Set<string>>(new Set())
+  const [hasPermissionsRestrictions, setHasPermissionsRestrictions] = useState(false)
 
   const loadFolders = useCallback(async () => {
+    if (!user) return
+    
     const supabase = createClient()
+
+    // Load teacher permissions for this user
+    const { data: permissionsData } = await supabase
+      .from("teacher_folder_permissions")
+      .select("folder_id, can_view, can_edit")
+      .eq("teacher_id", user.id)
+
+    // Build permission sets
+    const viewable = new Set<string>()
+    const editable = new Set<string>()
+    
+    permissionsData?.forEach((p) => {
+      if (p.can_view) viewable.add(p.folder_id)
+      if (p.can_edit) editable.add(p.folder_id)
+    })
+    
+    setViewableFolderIds(viewable)
+    setEditableFolderIds(editable)
+    setHasPermissionsRestrictions(permissionsData && permissionsData.length > 0)
 
     // Load all folders
     const { data: foldersData } = await supabase
@@ -79,14 +105,33 @@ export default function TeacherContentPage() {
       .order("position, name")
 
     if (foldersData) {
-      setAllFolders(foldersData)
+      // If teacher has specific permissions, filter folders
+      let filteredFolders = foldersData
+      if (permissionsData && permissionsData.length > 0) {
+        // Get all viewable folder IDs including parent folders for navigation
+        const viewableFolderIdsWithParents = new Set<string>(viewable)
+        
+        // For each viewable folder, also include its parent folders for navigation
+        const addParentFolders = (folderId: string) => {
+          const folder = foldersData.find(f => f.id === folderId)
+          if (folder?.parent_id) {
+            viewableFolderIdsWithParents.add(folder.parent_id)
+            addParentFolders(folder.parent_id)
+          }
+        }
+        viewable.forEach(folderId => addParentFolders(folderId))
+        
+        filteredFolders = foldersData.filter(f => viewableFolderIdsWithParents.has(f.id))
+      }
+      
+      setAllFolders(filteredFolders)
       // Build tree structure
-      const tree = buildFolderTree(foldersData, filesData || [])
+      const tree = buildFolderTree(filteredFolders, filesData || [])
       setFolders(tree)
     }
 
     setLoading(false)
-  }, [])
+  }, [user])
 
   useEffect(() => {
     loadFolders()
@@ -130,6 +175,19 @@ export default function TeacherContentPage() {
     }
     setExpandedFolders(newExpanded)
     setSelectedFolder(folderId)
+  }
+
+  // Check if teacher can edit a specific folder
+  const canEditFolder = (folderId: string): boolean => {
+    // If no permissions set, teacher can edit all folders
+    if (!hasPermissionsRestrictions) return true
+    return editableFolderIds.has(folderId)
+  }
+  
+  // Check if teacher can view a folder (for showing in dropdowns)
+  const canViewFolder = (folderId: string): boolean => {
+    if (!hasPermissionsRestrictions) return true
+    return viewableFolderIds.has(folderId)
   }
 
   const handleCreateFolder = async () => {
@@ -344,6 +402,7 @@ export default function TeacherContentPage() {
   const renderFolder = (folder: FolderWithChildren, depth: number = 0) => {
     const isExpanded = expandedFolders.has(folder.id)
     const isSelected = selectedFolder === folder.id
+    const canEdit = canEditFolder(folder.id)
 
     return (
       <div key={folder.id}>
@@ -368,43 +427,50 @@ export default function TeacherContentPage() {
           {folder.is_restricted && (
             <Lock className="h-3 w-3 text-amber-500" />
           )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 opacity-0 group-hover:opacity-100"
-            title="Manage Access"
-            onClick={(e) => {
-              e.stopPropagation()
-              setPermissionsFolderId(folder.id)
-              setPermissionsDialogOpen(true)
-            }}
-          >
-            <Users className="h-3 w-3 text-muted-foreground" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 opacity-0 group-hover:opacity-100"
-            title="File Order"
-            onClick={(e) => {
-              e.stopPropagation()
-              setFileOrderFolderId(folder.id)
-              setFileOrderDialogOpen(true)
-            }}
-          >
-            <ListOrdered className="h-3 w-3 text-muted-foreground" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 opacity-0 group-hover:opacity-100"
-            onClick={(e) => {
-              e.stopPropagation()
-              handleDeleteFolder(folder.id)
-            }}
-          >
-            <Trash2 className="h-3 w-3 text-destructive" />
-          </Button>
+          {!canEdit && hasPermissionsRestrictions && (
+            <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">View only</span>
+          )}
+          {canEdit && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                title="Manage Access"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setPermissionsFolderId(folder.id)
+                  setPermissionsDialogOpen(true)
+                }}
+              >
+                <Users className="h-3 w-3 text-muted-foreground" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                title="File Order"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setFileOrderFolderId(folder.id)
+                  setFileOrderDialogOpen(true)
+                }}
+              >
+                <ListOrdered className="h-3 w-3 text-muted-foreground" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleDeleteFolder(folder.id)
+                }}
+              >
+                <Trash2 className="h-3 w-3 text-destructive" />
+              </Button>
+            </>
+          )}
         </div>
 
         {isExpanded && (
@@ -420,17 +486,19 @@ export default function TeacherContentPage() {
               >
                 {getFileIcon(file)}
                 <span className="flex-1 text-sm">{file.name}</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleDeleteFile(file.id)
-                  }}
-                >
-                  <Trash2 className="h-3 w-3 text-destructive" />
-                </Button>
+                {canEdit && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDeleteFile(file.id)
+                    }}
+                  >
+                    <Trash2 className="h-3 w-3 text-destructive" />
+                  </Button>
+                )}
               </div>
             ))}
             {folder.children.map((child) => renderFolder(child, depth + 1))}
@@ -547,7 +615,7 @@ export default function TeacherContentPage() {
                       <SelectValue placeholder="Select folder" />
                     </SelectTrigger>
                     <SelectContent>
-                      {allFolders.map((f) => (
+                      {allFolders.filter(f => canEditFolder(f.id)).map((f) => (
                         <SelectItem key={f.id} value={f.id}>
                           {f.name}
                         </SelectItem>
@@ -620,7 +688,7 @@ export default function TeacherContentPage() {
                       <SelectValue placeholder="Select folder" />
                     </SelectTrigger>
                     <SelectContent>
-                      {allFolders.map((f) => (
+                      {allFolders.filter(f => canEditFolder(f.id)).map((f) => (
                         <SelectItem key={f.id} value={f.id}>
                           {f.name}
                         </SelectItem>
@@ -670,7 +738,7 @@ export default function TeacherContentPage() {
                       <SelectValue placeholder="Select folder" />
                     </SelectTrigger>
                     <SelectContent>
-                      {allFolders.map((f) => (
+                      {allFolders.filter(f => canEditFolder(f.id)).map((f) => (
                         <SelectItem key={f.id} value={f.id}>
                           {f.name}
                         </SelectItem>
