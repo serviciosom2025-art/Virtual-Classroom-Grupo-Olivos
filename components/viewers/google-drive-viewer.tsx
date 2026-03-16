@@ -119,25 +119,30 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
   if (isFullscreen) {
     return (
       <div className="fixed inset-0 z-50 bg-black">
-        {/* Header with title and close button */}
+        {/* Header with title and collapse button */}
         <div className="absolute top-0 left-0 right-0 h-12 bg-slate-900/90 backdrop-blur-sm flex items-center justify-between px-4 z-10">
           <h3 className="text-white font-medium truncate">{title}</h3>
           <Button
-            variant="ghost"
-            size="icon"
-            className="text-white hover:bg-white/20"
+            variant="secondary"
+            size="sm"
+            className="bg-slate-700 hover:bg-slate-600 text-white border-0"
             onClick={toggleFullscreen}
           >
-            <X className="h-5 w-5" />
+            <Minimize2 className="h-4 w-4 mr-2" />
+            Collapse
           </Button>
         </div>
         
         {/* Document container - with overflow hidden to clip Google UI elements */}
-        <div className="absolute top-12 left-0 right-0 bottom-0 overflow-hidden">
+        <div className="absolute top-12 left-0 bottom-0 overflow-hidden" style={{ right: "-56px" }}>
           <iframe
             src={embedUrl}
-            className="w-full h-[calc(100%+60px)] border-0"
-            style={{ marginBottom: "-60px" }}
+            className="border-0"
+            style={{ 
+              width: "calc(100% + 56px)", 
+              height: "calc(100% + 60px)",
+              marginBottom: "-60px"
+            }}
             allow="autoplay"
             title={title}
           />
@@ -147,7 +152,7 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
   }
 
   return (
-    <div ref={containerRef} className="h-full w-full bg-slate-900 relative">
+    <div ref={containerRef} className="h-full w-full bg-slate-900 relative overflow-hidden">
       {/* Expand button */}
       <Button
         variant="secondary"
@@ -159,12 +164,19 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
         Expand
       </Button>
       
+      {/* Overlay to cover the right side popup icon */}
+      <div className="absolute top-0 right-0 w-14 h-full bg-slate-900 z-[5]" />
+      
       {/* Document container - with overflow hidden to clip Google branding */}
       <div className="w-full h-full overflow-hidden relative">
         <iframe
           src={embedUrl}
-          className="w-full h-[calc(100%+60px)] border-0"
-          style={{ marginBottom: "-60px" }}
+          className="border-0"
+          style={{ 
+            width: "calc(100% + 56px)", 
+            height: "calc(100% + 60px)",
+            marginBottom: "-60px"
+          }}
           allow="autoplay"
           title={title}
         />
