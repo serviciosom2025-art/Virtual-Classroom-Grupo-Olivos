@@ -304,20 +304,40 @@ export default function TeacherContentPage() {
     loadFolders()
   }
 
-  const getFileIcon = (type: string) => {
+  const getFileIcon = (file: FileItem) => {
+    const type = file.type;
+    const url = file.external_url || "";
+    const name = file.name.toLowerCase();
+    
+    // Handle Google Drive documents - detect PPT vs PDF
+    if (type === "google_drive_document") {
+      const isPPT = url.includes("/presentation/") || 
+                    url.includes("docs.google.com/presentation") ||
+                    name.endsWith(".pptx") || 
+                    name.endsWith(".ppt");
+      const isPDF = (url.includes("/file/d/") && !isPPT) ||
+                    name.endsWith(".pdf");
+      
+      if (isPPT) {
+        return <Presentation className="h-4 w-4 text-orange-500" />;
+      } else if (isPDF) {
+        return <FileText className="h-4 w-4 text-red-500" />;
+      }
+      // Default for Google Drive docs (Google Docs, Sheets, etc.)
+      return <FileText className="h-4 w-4 text-green-500" />;
+    }
+    
     switch (type) {
       case "video":
-        return <Video className="h-4 w-4 text-blue-500" />
+        return <Video className="h-4 w-4 text-blue-500" />;
       case "external_video":
-        return <Link2 className="h-4 w-4 text-purple-500" />
+        return <Link2 className="h-4 w-4 text-purple-500" />;
       case "pdf":
-        return <FileText className="h-4 w-4 text-red-500" />
+        return <FileText className="h-4 w-4 text-red-500" />;
       case "powerpoint":
-        return <Presentation className="h-4 w-4 text-orange-500" />
-      case "google_drive_document":
-        return <FileSpreadsheet className="h-4 w-4 text-green-500" />
+        return <Presentation className="h-4 w-4 text-orange-500" />;
       default:
-        return <FileText className="h-4 w-4" />
+        return <FileText className="h-4 w-4" />;
     }
   }
 
@@ -398,7 +418,7 @@ export default function TeacherContentPage() {
                 style={{ paddingLeft: `${(depth + 1) * 16 + 24}px` }}
                 onClick={() => setSelectedFile(file)}
               >
-                {getFileIcon(file.type)}
+                {getFileIcon(file)}
                 <span className="flex-1 text-sm">{file.name}</span>
                 <Button
                   variant="ghost"

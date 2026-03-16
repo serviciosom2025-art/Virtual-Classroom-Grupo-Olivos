@@ -48,7 +48,28 @@ export function FileOrderManager({
     setIsSequential(sequentialOrder);
   }, [files, sequentialOrder, open]);
 
-  const getFileIcon = (type: string) => {
+  const getFileIcon = (file: FileItem) => {
+    const type = file.type;
+    const url = file.external_url || "";
+    const name = file.name.toLowerCase();
+    
+    // Handle Google Drive documents - detect PPT vs PDF
+    if (type === "google_drive_document") {
+      const isPPT = url.includes("/presentation/") || 
+                    url.includes("docs.google.com/presentation") ||
+                    name.endsWith(".pptx") || 
+                    name.endsWith(".ppt");
+      const isPDF = (url.includes("/file/d/") && !isPPT) ||
+                    name.endsWith(".pdf");
+      
+      if (isPPT) {
+        return <Presentation className="h-4 w-4 text-orange-500" />;
+      } else if (isPDF) {
+        return <FileText className="h-4 w-4 text-red-500" />;
+      }
+      return <FileText className="h-4 w-4 text-green-500" />;
+    }
+    
     switch (type) {
       case "video":
         return <Video className="h-4 w-4 text-blue-500" />;
@@ -205,7 +226,7 @@ export function FileOrderManager({
                   <span className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs font-medium text-slate-600">
                     {index + 1}
                   </span>
-                  {getFileIcon(file.type)}
+                  {getFileIcon(file)}
                   <span className="flex-1 text-sm truncate">{file.name}</span>
                   <div className="flex gap-1">
                     <Button
