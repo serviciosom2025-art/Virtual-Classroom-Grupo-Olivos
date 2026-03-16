@@ -17,9 +17,17 @@ export interface Folder {
   created_by: string;
   created_at: string;
   updated_at: string;
+  is_restricted?: boolean;
   children?: Folder[];
   files?: FileItem[];
   exams?: Exam[];
+}
+
+export interface FolderPermission {
+  id: string;
+  folder_id: string;
+  student_id: string;
+  created_at: string;
 }
 
 export interface FileItem {

@@ -25,7 +25,10 @@ import {
   Edit2,
   MoreHorizontal,
   Link2,
+  Users,
+  Lock,
 } from "lucide-react";
+import { FolderPermissionsDialog } from "@/components/folders/folder-permissions-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,6 +58,7 @@ export default function FoldersPage() {
   const [uploadFileOpen, setUploadFileOpen] = useState(false);
   const [editFolderOpen, setEditFolderOpen] = useState(false);
   const [externalLinkOpen, setExternalLinkOpen] = useState(false);
+  const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
 
   // Form states
@@ -460,6 +464,13 @@ export default function FoldersPage() {
                           <Edit2 className="w-4 h-4 mr-2" />
                           Rename Folder
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setPermissionsDialogOpen(true)}>
+                          <Users className="w-4 h-4 mr-2" />
+                          Manage Access
+                          {selectedFolderData?.is_restricted && (
+                            <Lock className="w-3 h-3 ml-2 text-amber-500" />
+                          )}
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={handleDeleteFolder} className="text-red-600">
                           <Trash2 className="w-4 h-4 mr-2" />
                           Delete Folder
@@ -523,6 +534,18 @@ export default function FoldersPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Folder Permissions Dialog */}
+      {selectedFolderId && selectedFolderData && (
+        <FolderPermissionsDialog
+          open={permissionsDialogOpen}
+          onOpenChange={setPermissionsDialogOpen}
+          folderId={selectedFolderId}
+          folderName={selectedFolderData.name}
+          isRestricted={selectedFolderData.is_restricted || false}
+          onSave={fetchData}
+        />
+      )}
     </div>
   );
 }
