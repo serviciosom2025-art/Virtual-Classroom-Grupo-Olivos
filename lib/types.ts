@@ -66,8 +66,16 @@ export interface Exam {
   randomize_answers: boolean;
   time_limit: number | null;
   is_active: boolean;
+  is_restricted?: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface ExamPermission {
+  id: string;
+  exam_id: string;
+  student_id: string;
+  created_at: string;
 }
 
 export interface Question {

@@ -50,9 +50,12 @@ import {
   Copy,
   Eye,
   ClipboardList,
+  Users,
+  Lock,
 } from "lucide-react";
 import type { Exam, Folder } from "@/lib/types";
 import Link from "next/link";
+import { ExamPermissionsDialog } from "@/components/exams/exam-permissions-dialog";
 
 export default function ExamsPage() {
   const { user } = useAuth();
@@ -62,6 +65,8 @@ export default function ExamsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
+  const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
+  const [selectedExamForPermissions, setSelectedExamForPermissions] = useState<Exam | null>(null);
 
   // Form state
   const [newExam, setNewExam] = useState({
@@ -385,7 +390,12 @@ export default function ExamsPage() {
               <TableBody>
                 {filteredExams.map((exam) => (
                   <TableRow key={exam.id}>
-                    <TableCell className="font-medium">{exam.title}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {exam.title}
+                        {exam.is_restricted && <Lock className="h-4 w-4 text-amber-500" />}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-slate-500 text-sm">
                       {getFolderName(exam.folder_id)}
                     </TableCell>
@@ -420,6 +430,16 @@ export default function ExamsPage() {
                               View Results
                             </Link>
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedExamForPermissions(exam);
+                              setPermissionsDialogOpen(true);
+                            }}
+                          >
+                            <Users className="w-4 h-4 mr-2" />
+                            Manage Access
+                            {exam.is_restricted && <Lock className="w-3 h-3 ml-2 text-amber-500" />}
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDuplicateExam(exam)}>
                             <Copy className="w-4 h-4 mr-2" />
                             Duplicate
@@ -444,6 +464,18 @@ export default function ExamsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Exam Permissions Dialog */}
+      {selectedExamForPermissions && (
+        <ExamPermissionsDialog
+          open={permissionsDialogOpen}
+          onOpenChange={setPermissionsDialogOpen}
+          examId={selectedExamForPermissions.id}
+          examTitle={selectedExamForPermissions.title}
+          isRestricted={selectedExamForPermissions.is_restricted || false}
+          onSave={fetchData}
+        />
+      )}
     </div>
   );
 }

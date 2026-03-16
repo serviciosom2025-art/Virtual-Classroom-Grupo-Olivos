@@ -12,8 +12,9 @@ import { Field, FieldLabel } from "@/components/ui/field"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Plus, Edit, Trash2, FileQuestion, Settings } from "lucide-react"
+import { Plus, Edit, Trash2, FileQuestion, Settings, Users, Lock } from "lucide-react"
 import Link from "next/link"
+import { ExamPermissionsDialog } from "@/components/exams/exam-permissions-dialog"
 import type { Exam, Folder } from "@/lib/types"
 
 interface ExamWithDetails extends Exam {
@@ -27,6 +28,8 @@ export default function TeacherExamsPage() {
   const [folders, setFolders] = useState<Folder[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false)
+  const [selectedExamForPermissions, setSelectedExamForPermissions] = useState<ExamWithDetails | null>(null)
   
   const [newExam, setNewExam] = useState({
     title: "",
@@ -251,7 +254,10 @@ export default function TeacherExamsPage() {
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div>
-                    <CardTitle className="text-lg">{exam.title}</CardTitle>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      {exam.title}
+                      {exam.is_restricted && <Lock className="h-4 w-4 text-amber-500" />}
+                    </CardTitle>
                     <CardDescription>{exam.folder?.name || "No folder"}</CardDescription>
                   </div>
                   <Badge variant={exam.is_active ? "default" : "secondary"}>
@@ -284,6 +290,17 @@ export default function TeacherExamsPage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    title="Manage Access"
+                    onClick={() => {
+                      setSelectedExamForPermissions(exam)
+                      setPermissionsDialogOpen(true)
+                    }}
+                  >
+                    <Users className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => handleToggleActive(exam.id, exam.is_active)}
                   >
                     <Settings className="h-4 w-4" />
@@ -300,6 +317,18 @@ export default function TeacherExamsPage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {/* Exam Permissions Dialog */}
+      {selectedExamForPermissions && (
+        <ExamPermissionsDialog
+          open={permissionsDialogOpen}
+          onOpenChange={setPermissionsDialogOpen}
+          examId={selectedExamForPermissions.id}
+          examTitle={selectedExamForPermissions.title}
+          isRestricted={selectedExamForPermissions.is_restricted || false}
+          onSave={loadExams}
+        />
       )}
     </div>
   )
