@@ -127,6 +127,7 @@ export interface PlatformSettings {
   background_color: string;
   background_image_url: string | null;
   use_background_image: boolean;
+  allow_teacher_file_upload: boolean;
   created_at: string;
   updated_at: string;
 }
