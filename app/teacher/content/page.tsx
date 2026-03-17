@@ -726,7 +726,8 @@ export default function TeacherContentPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="root">Root (No Parent)</SelectItem>
-                      {allFolders.map((f) => (
+                      {/* Only show folders created by current teacher */}
+                      {allFolders.filter(f => f.created_by === user?.id).map((f) => (
                         <SelectItem key={f.id} value={f.id}>
                           {f.name}
                         </SelectItem>
