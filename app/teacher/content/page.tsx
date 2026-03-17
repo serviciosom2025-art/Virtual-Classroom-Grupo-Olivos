@@ -22,7 +22,7 @@ interface FolderWithChildren extends FolderType {
 }
 
 export default function TeacherContentPage() {
-  const { user } = useAuth()
+  const { user, settings } = useAuth()
   const [folders, setFolders] = useState<FolderWithChildren[]>([])
   const [allFolders, setAllFolders] = useState<FolderType[]>([])
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
@@ -803,6 +803,8 @@ export default function TeacherContentPage() {
             </DialogContent>
           </Dialog>
 
+          {/* Only show Upload File button if admin has enabled it */}
+          {(settings?.allow_teacher_file_upload ?? true) && (
           <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -853,6 +855,7 @@ export default function TeacherContentPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          )}
         </div>
       </div>
 
