@@ -10,7 +10,7 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Upload, Save } from "lucide-react";
+import { Upload, Save, X, GraduationCap } from "lucide-react";
 import type { PlatformSettings } from "@/lib/types";
 
 export default function SettingsPage() {
@@ -19,6 +19,8 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
+  const [deleteLogo, setDeleteLogo] = useState(false);
+  const [deleteBackground, setDeleteBackground] = useState(false);
 
   useEffect(() => {
     if (currentSettings) {
@@ -35,8 +37,12 @@ export default function SettingsPage() {
       let logoUrl = settings.logo_url;
       let backgroundUrl = settings.background_image_url;
 
+      // Handle logo deletion
+      if (deleteLogo) {
+        logoUrl = null;
+      }
       // Upload logo if changed
-      if (logoFile) {
+      else if (logoFile) {
         const fileExt = logoFile.name.split(".").pop();
         const fileName = `logo-${Date.now()}.${fileExt}`;
         const { data, error } = await supabase.storage
@@ -51,8 +57,12 @@ export default function SettingsPage() {
         }
       }
 
+      // Handle background deletion
+      if (deleteBackground) {
+        backgroundUrl = null;
+      }
       // Upload background if changed
-      if (backgroundFile) {
+      else if (backgroundFile) {
         const fileExt = backgroundFile.name.split(".").pop();
         const fileName = `background-${Date.now()}.${fileExt}`;
         const { data, error } = await supabase.storage
@@ -90,6 +100,8 @@ export default function SettingsPage() {
       await refreshSettings();
       setLogoFile(null);
       setBackgroundFile(null);
+      setDeleteLogo(false);
+      setDeleteBackground(false);
     } catch (error) {
       console.error("Error saving settings:", error);
       alert("Failed to save settings");
@@ -134,21 +146,43 @@ export default function SettingsPage() {
           <Field>
             <FieldLabel>Logo</FieldLabel>
             <div className="flex items-center gap-4">
-              {(settings.logo_url || logoFile) && (
+              {/* Show current logo, new file, or default icon */}
+              <div className="relative">
                 <div className="w-16 h-16 rounded-lg border border-slate-200 flex items-center justify-center overflow-hidden bg-slate-50">
-                  <img
-                    src={logoFile ? URL.createObjectURL(logoFile) : settings.logo_url || ""}
-                    alt="Logo preview"
-                    className="max-w-full max-h-full object-contain"
-                  />
+                  {(settings.logo_url || logoFile) && !deleteLogo ? (
+                    <img
+                      src={logoFile ? URL.createObjectURL(logoFile) : settings.logo_url || ""}
+                      alt="Logo preview"
+                      className="max-w-full max-h-full object-contain"
+                    />
+                  ) : (
+                    <GraduationCap className="w-8 h-8 text-blue-600" />
+                  )}
                 </div>
-              )}
+                {/* Show X button to delete logo when there's a logo */}
+                {(settings.logo_url || logoFile) && !deleteLogo && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteLogo(true);
+                      setLogoFile(null);
+                    }}
+                    className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white transition-colors"
+                    title="Remove logo"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
               <label className="cursor-pointer">
                 <Input
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    setLogoFile(e.target.files?.[0] || null);
+                    setDeleteLogo(false);
+                  }}
                 />
                 <div className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
                   <Upload className="w-4 h-4" />
@@ -242,17 +276,31 @@ export default function SettingsPage() {
             <Field>
               <FieldLabel>Background Image</FieldLabel>
               <div className="space-y-4">
-                {(settings.background_image_url || backgroundFile) && (
-                  <div className="w-full h-40 rounded-lg border border-slate-200 overflow-hidden">
-                    <img
-                      src={
-                        backgroundFile
-                          ? URL.createObjectURL(backgroundFile)
-                          : settings.background_image_url || ""
-                      }
-                      alt="Background preview"
-                      className="w-full h-full object-cover"
-                    />
+                {(settings.background_image_url || backgroundFile) && !deleteBackground && (
+                  <div className="relative">
+                    <div className="w-full h-40 rounded-lg border border-slate-200 overflow-hidden">
+                      <img
+                        src={
+                          backgroundFile
+                            ? URL.createObjectURL(backgroundFile)
+                            : settings.background_image_url || ""
+                        }
+                        alt="Background preview"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    {/* X button to delete background */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteBackground(true);
+                        setBackgroundFile(null);
+                      }}
+                      className="absolute top-2 right-2 w-6 h-6 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white transition-colors shadow-md"
+                      title="Remove background image"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
                 )}
                 <label className="cursor-pointer inline-block">
@@ -260,7 +308,10 @@ export default function SettingsPage() {
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    onChange={(e) => setBackgroundFile(e.target.files?.[0] || null)}
+                    onChange={(e) => {
+                      setBackgroundFile(e.target.files?.[0] || null);
+                      setDeleteBackground(false);
+                    }}
                   />
                   <div className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
                     <Upload className="w-4 h-4" />
