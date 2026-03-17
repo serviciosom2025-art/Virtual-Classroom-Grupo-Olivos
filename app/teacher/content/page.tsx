@@ -114,28 +114,31 @@ export default function TeacherContentPage() {
     setHasPermissionsRestrictions(restrictedFolderIds.size > 0)
 
     if (foldersData) {
-      // Filter folders: show all non-restricted + restricted ones the teacher has view access to
-      let filteredFolders = foldersData.filter(folder => {
-        // If folder is not restricted, teacher can see it
-        if (!folder.is_teacher_restricted) return true
-        // If folder is restricted, check if teacher has view permission
-        return viewable.has(folder.id)
+      // Build a set of folders that are hidden (restricted without view permission)
+      // AND all their descendant folders
+      const hiddenFolderIds = new Set<string>()
+      
+      // First pass: identify directly restricted folders without view access
+      foldersData.forEach(folder => {
+        if (folder.is_teacher_restricted && !viewable.has(folder.id)) {
+          hiddenFolderIds.add(folder.id)
+        }
       })
       
-      // Also include parent folders for navigation purposes
-      const includedFolderIds = new Set(filteredFolders.map(f => f.id))
-      const addParentFolders = (folderId: string) => {
-        const folder = foldersData.find(f => f.id === folderId)
-        if (folder?.parent_id && !includedFolderIds.has(folder.parent_id)) {
-          const parentFolder = foldersData.find(f => f.id === folder.parent_id)
-          if (parentFolder) {
-            filteredFolders.push(parentFolder)
-            includedFolderIds.add(parentFolder.id)
-            addParentFolders(parentFolder.id)
+      // Second pass: hide children of hidden folders (cascade the restriction)
+      let changed = true
+      while (changed) {
+        changed = false
+        foldersData.forEach(folder => {
+          if (!hiddenFolderIds.has(folder.id) && folder.parent_id && hiddenFolderIds.has(folder.parent_id)) {
+            hiddenFolderIds.add(folder.id)
+            changed = true
           }
-        }
+        })
       }
-      filteredFolders.forEach(f => addParentFolders(f.id))
+      
+      // Filter out hidden folders
+      const filteredFolders = foldersData.filter(folder => !hiddenFolderIds.has(folder.id))
       
       setAllFolders(filteredFolders)
       // Build tree structure
@@ -190,14 +193,37 @@ export default function TeacherContentPage() {
     setSelectedFolder(folderId)
   }
 
+  // Helper to get all ancestor folder IDs
+  const getAncestorFolderIds = (folderId: string): string[] => {
+    const ancestors: string[] = []
+    let currentFolder = allFolders.find(f => f.id === folderId)
+    while (currentFolder?.parent_id) {
+      ancestors.push(currentFolder.parent_id)
+      currentFolder = allFolders.find(f => f.id === currentFolder!.parent_id)
+    }
+    return ancestors
+  }
+
   // Check if teacher can edit a specific folder
+  // Edit permission is denied if this folder OR any parent folder is restricted without edit permission
   const canEditFolder = (folderId: string): boolean => {
-    // Find the folder to check if it's restricted
     const folder = allFolders.find(f => f.id === folderId)
-    // If folder is not restricted, all teachers can edit
-    if (!folder?.is_teacher_restricted) return true
-    // If restricted, check specific permissions
-    return editableFolderIds.has(folderId)
+    
+    // Check this folder's restriction
+    if (folder?.is_teacher_restricted && !editableFolderIds.has(folderId)) {
+      return false
+    }
+    
+    // Check all parent folders - if any parent is restricted without edit, this folder is also not editable
+    const ancestors = getAncestorFolderIds(folderId)
+    for (const ancestorId of ancestors) {
+      const ancestorFolder = allFolders.find(f => f.id === ancestorId)
+      if (ancestorFolder?.is_teacher_restricted && !editableFolderIds.has(ancestorId)) {
+        return false
+      }
+    }
+    
+    return true
   }
   
   // Check if teacher can view a folder (for showing in dropdowns)
@@ -445,9 +471,6 @@ export default function TeacherContentPage() {
           <span className="flex-1 text-sm font-medium">{folder.name}</span>
           {folder.is_restricted && (
             <Lock className="h-3 w-3 text-amber-500" />
-          )}
-          {!canEdit && hasPermissionsRestrictions && (
-            <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">View only</span>
           )}
           {canEdit && (
             <>
