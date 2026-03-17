@@ -79,8 +79,9 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
     }
 
     if (originalUrl.includes("docs.google.com/presentation")) {
-      // Google Slides - use pub URL which includes navigation controls (back/forward arrows)
-      return `https://docs.google.com/presentation/d/${fileId}/pub?start=false&loop=false&delayms=60000`;
+      // Google Slides - use embed URL with start=false to not auto-advance
+      // Users can navigate using arrow keys after clicking inside, or use the built-in controls
+      return `https://docs.google.com/presentation/d/${fileId}/embed?start=false&loop=false&delayms=60000`;
     } else if (originalUrl.includes("docs.google.com/document")) {
       // Google Docs - use preview URL
       return `https://docs.google.com/document/d/${fileId}/preview?rm=minimal`;
