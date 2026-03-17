@@ -145,6 +145,9 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
         
         {/* Small overlay to cover just the popup icon in top-right */}
         <div className="absolute top-0 right-0 w-12 h-12 bg-slate-900 pointer-events-none" />
+        
+        {/* Overlay to cover "Google Slides" branding in bottom-right */}
+        <div className="absolute bottom-0 right-0 w-36 h-10 bg-slate-800 pointer-events-none" />
       </div>
     </div>,
     document.body
@@ -168,6 +171,9 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
         {/* Small overlay to cover just the popup icon in top-right corner */}
         <div className="absolute top-0 right-0 w-12 h-12 bg-slate-900 z-[5] pointer-events-none" />
         
+        {/* Overlay to cover "Google Slides" branding in bottom-right */}
+        <div className="absolute bottom-0 right-0 w-36 h-10 bg-slate-800 z-[5] pointer-events-none" />
+        
         {/* Document iframe - full size */}
         <iframe
           src={embedUrl}
@@ -176,8 +182,6 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
           allowFullScreen
           title={title}
         />
-        
-        
       </div>
     </>
   );
