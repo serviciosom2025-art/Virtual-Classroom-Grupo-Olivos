@@ -210,25 +210,37 @@ export default function TeacherContentPage() {
   }
 
   // Check if teacher can edit a specific folder
-  // Edit permission is denied if this folder OR any parent folder is restricted without edit permission
+  // By default: only the folder creator can edit, unless they grant permission to others
   const canEditFolder = (folderId: string): boolean => {
     const folder = allFolders.find(f => f.id === folderId)
+    if (!folder) return false
     
-    // Check this folder's restriction
-    if (folder?.is_teacher_restricted && !editableFolderIds.has(folderId)) {
-      return false
+    // Folder creator can always edit their own folders
+    if (folder.created_by === user?.id) {
+      return true
     }
     
-    // Check all parent folders - if any parent is restricted without edit, this folder is also not editable
+    // Check if user has explicit edit permission for this folder
+    if (editableFolderIds.has(folderId)) {
+      return true
+    }
+    
+    // Check all parent folders - if user is creator of any parent OR has edit permission, they can edit children
     const ancestors = getAncestorFolderIds(folderId)
     for (const ancestorId of ancestors) {
       const ancestorFolder = allFolders.find(f => f.id === ancestorId)
-      if (ancestorFolder?.is_teacher_restricted && !editableFolderIds.has(ancestorId)) {
-        return false
+      // If user created a parent folder, they can edit all children
+      if (ancestorFolder?.created_by === user?.id) {
+        return true
+      }
+      // If user has explicit edit permission on a parent, they can edit children
+      if (editableFolderIds.has(ancestorId)) {
+        return true
       }
     }
     
-    return true
+    // By default, teachers who are not the creator cannot edit
+    return false
   }
   
   // Check if teacher can view a folder (for showing in dropdowns)
