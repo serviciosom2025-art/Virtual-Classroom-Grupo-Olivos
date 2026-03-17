@@ -9,9 +9,10 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { FolderPlus, Upload, Folder, FileText, Video, Presentation, Trash2, ChevronRight, ChevronDown, Link2, X, Users, Lock, ListOrdered, FileSpreadsheet, PanelLeftClose, PanelLeft } from "lucide-react"
+import { FolderPlus, Upload, Folder, FileText, Video, Presentation, Trash2, ChevronRight, ChevronDown, Link2, X, Users, Lock, ListOrdered, FileSpreadsheet, PanelLeftClose, PanelLeft, GraduationCap } from "lucide-react"
 import { FileViewer } from "@/components/viewers/file-viewer"
 import { FolderPermissionsDialog } from "@/components/folders/folder-permissions-dialog"
+import { TeacherPermissionsDialog } from "@/components/folders/teacher-permissions-dialog"
 import { FileOrderManager } from "@/components/folders/file-order-manager"
 import type { Folder as FolderType, FileItem } from "@/lib/types"
 
@@ -52,9 +53,13 @@ export default function TeacherContentPage() {
   const [documentLinkFolderId, setDocumentLinkFolderId] = useState<string>("")
   const [savingDocumentLink, setSavingDocumentLink] = useState(false)
   
-  // Permissions dialog state
+  // Student permissions dialog state
   const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false)
   const [permissionsFolderId, setPermissionsFolderId] = useState<string | null>(null)
+  
+  // Teacher permissions dialog state
+  const [teacherPermissionsDialogOpen, setTeacherPermissionsDialogOpen] = useState(false)
+  const [teacherPermissionsFolderId, setTeacherPermissionsFolderId] = useState<string | null>(null)
   
   // File order dialog state
   const [fileOrderDialogOpen, setFileOrderDialogOpen] = useState(false)
@@ -233,6 +238,12 @@ export default function TeacherContentPage() {
     if (!folder?.is_teacher_restricted) return true
     // If restricted, check specific permissions
     return viewableFolderIds.has(folderId)
+  }
+  
+  // Check if current user is the creator of a folder
+  const isFolderCreator = (folderId: string): boolean => {
+    const folder = allFolders.find(f => f.id === folderId)
+    return folder?.created_by === user?.id
   }
 
   const handleCreateFolder = async () => {
@@ -448,6 +459,7 @@ export default function TeacherContentPage() {
     const isExpanded = expandedFolders.has(folder.id)
     const isSelected = selectedFolder === folder.id
     const canEdit = canEditFolder(folder.id)
+    const isCreator = isFolderCreator(folder.id)
 
     return (
       <div key={folder.id}>
@@ -472,13 +484,32 @@ export default function TeacherContentPage() {
           {folder.is_restricted && (
             <Lock className="h-3 w-3 text-amber-500" />
           )}
+          {folder.is_teacher_restricted && (
+            <GraduationCap className="h-3 w-3 text-blue-500" title="Teacher access restricted" />
+          )}
+          {/* Teacher Access button - only show if current user created this folder */}
+          {isCreator && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 opacity-0 group-hover:opacity-100"
+              title="Teacher Access"
+              onClick={(e) => {
+                e.stopPropagation()
+                setTeacherPermissionsFolderId(folder.id)
+                setTeacherPermissionsDialogOpen(true)
+              }}
+            >
+              <GraduationCap className="h-3 w-3 text-blue-500" />
+            </Button>
+          )}
           {canEdit && (
             <>
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                title="Manage Access"
+                title="Student Access"
                 onClick={(e) => {
                   e.stopPropagation()
                   setPermissionsFolderId(folder.id)
@@ -892,7 +923,7 @@ export default function TeacherContentPage() {
         </Card>
       </div>
 
-      {/* Folder Permissions Dialog */}
+      {/* Student Permissions Dialog */}
       {permissionsFolderId && (
         <FolderPermissionsDialog
           open={permissionsDialogOpen}
@@ -900,6 +931,18 @@ export default function TeacherContentPage() {
           folderId={permissionsFolderId}
           folderName={allFolders.find(f => f.id === permissionsFolderId)?.name || ""}
           isRestricted={allFolders.find(f => f.id === permissionsFolderId)?.is_restricted || false}
+          onSave={loadFolders}
+        />
+      )}
+
+      {/* Teacher Permissions Dialog - only for folder creators */}
+      {teacherPermissionsFolderId && (
+        <TeacherPermissionsDialog
+          open={teacherPermissionsDialogOpen}
+          onOpenChange={setTeacherPermissionsDialogOpen}
+          folderId={teacherPermissionsFolderId}
+          folderName={allFolders.find(f => f.id === teacherPermissionsFolderId)?.name || ""}
+          isTeacherRestricted={allFolders.find(f => f.id === teacherPermissionsFolderId)?.is_teacher_restricted || false}
           onSave={loadFolders}
         />
       )}
