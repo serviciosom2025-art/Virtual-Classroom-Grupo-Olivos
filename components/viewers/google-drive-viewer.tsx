@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { FileText, Maximize2, Minimize2 } from "lucide-react";
+import { FileText, Maximize2, Minimize2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface GoogleDriveViewerProps {
@@ -14,14 +14,19 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isPresentation, setIsPresentation] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(1);
   const containerRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const fullscreenIframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     try {
       // Convert Google Drive sharing link to embed/preview link
       const converted = convertGoogleDriveUrl(url);
       if (converted) {
-        setEmbedUrl(converted);
+        setEmbedUrl(converted.url);
+        setIsPresentation(converted.isPresentation);
         setError(null);
       } else {
         setError("Could not process the Google Drive link. Please ensure it's a valid sharing link.");
@@ -46,8 +51,33 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
     setIsFullscreen(prev => !prev);
   }, []);
 
+  // Navigate slides for presentations
+  const navigateSlide = useCallback((direction: 'prev' | 'next') => {
+    // Try to send keyboard event to the active iframe
+    const activeIframe = isFullscreen ? fullscreenIframeRef.current : iframeRef.current;
+    if (activeIframe) {
+      activeIframe.focus();
+      try {
+        // Try posting message to iframe
+        activeIframe.contentWindow?.postMessage({
+          type: 'keydown',
+          key: direction === 'next' ? 'ArrowRight' : 'ArrowLeft'
+        }, '*');
+      } catch {
+        // Cross-origin restriction
+      }
+    }
+    
+    // Update local slide counter for visual feedback
+    if (direction === 'next') {
+      setCurrentSlide(prev => prev + 1);
+    } else {
+      setCurrentSlide(prev => Math.max(1, prev - 1));
+    }
+  }, [isFullscreen]);
+
   // Convert various Google Drive URL formats to embeddable preview URL
-  function convertGoogleDriveUrl(originalUrl: string): string | null {
+  function convertGoogleDriveUrl(originalUrl: string): { url: string; isPresentation: boolean } | null {
     // Handle different Google Drive URL formats
     
     // Format 1: https://drive.google.com/file/d/FILE_ID/view?usp=sharing
@@ -79,18 +109,27 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
     }
 
     // Determine if it's a Google Docs/Slides/Sheets or a regular file
+    // Also check if file name suggests it's a PowerPoint
+    const isPptx = originalUrl.toLowerCase().includes('.pptx') || 
+                   originalUrl.toLowerCase().includes('.ppt') ||
+                   originalUrl.includes("docs.google.com/presentation");
+    
     if (originalUrl.includes("docs.google.com/presentation")) {
       // Google Slides - use embed URL with rm=minimal to hide branding
-      return `https://docs.google.com/presentation/d/${fileId}/embed?start=false&loop=false&delayms=3000&rm=minimal`;
+      return { 
+        url: `https://docs.google.com/presentation/d/${fileId}/embed?start=false&loop=false&delayms=3000&rm=minimal`,
+        isPresentation: true 
+      };
     } else if (originalUrl.includes("docs.google.com/document")) {
       // Google Docs - use preview URL
-      return `https://docs.google.com/document/d/${fileId}/preview?rm=minimal`;
+      return { url: `https://docs.google.com/document/d/${fileId}/preview?rm=minimal`, isPresentation: false };
     } else if (originalUrl.includes("docs.google.com/spreadsheets")) {
       // Google Sheets - use preview URL
-      return `https://docs.google.com/spreadsheets/d/${fileId}/preview?rm=minimal`;
+      return { url: `https://docs.google.com/spreadsheets/d/${fileId}/preview?rm=minimal`, isPresentation: false };
     } else {
       // Regular file (PDF, PPTX, etc.) - use preview URL that prevents download
-      return `https://drive.google.com/file/d/${fileId}/preview?rm=minimal`;
+      // PPTX files from Drive also need navigation arrows
+      return { url: `https://drive.google.com/file/d/${fileId}/preview?rm=minimal`, isPresentation: isPptx };
     }
   }
 
@@ -136,12 +175,42 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
       {/* Document container - full width display */}
       <div className="flex-1 relative">
         <iframe
+          ref={fullscreenIframeRef}
           src={embedUrl}
           className="w-full h-full border-0"
           allow="autoplay"
           allowFullScreen
           title={title}
         />
+        {/* Navigation Arrows for presentations */}
+        {isPresentation && (
+          <>
+            {/* Left Arrow - Previous Slide */}
+            <button
+              onClick={() => navigateSlide('prev')}
+              className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-14 h-14 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-all duration-200 shadow-lg hover:scale-110"
+              title="Previous slide"
+              aria-label="Previous slide"
+            >
+              <ChevronLeft className="w-10 h-10" />
+            </button>
+            
+            {/* Right Arrow - Next Slide */}
+            <button
+              onClick={() => navigateSlide('next')}
+              className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-14 h-14 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-all duration-200 shadow-lg hover:scale-110"
+              title="Next slide"
+              aria-label="Next slide"
+            >
+              <ChevronRight className="w-10 h-10" />
+            </button>
+            
+            {/* Slide indicator */}
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 px-5 py-2.5 bg-black/60 rounded-full text-white text-base font-medium">
+              Slide {currentSlide}
+            </div>
+          </>
+        )}
         {/* Small overlay to cover just the popup icon in top-right */}
         <div className="absolute top-0 right-0 w-12 h-12 bg-slate-900 pointer-events-none" />
       </div>
@@ -169,12 +238,43 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
         
         {/* Document iframe - full size */}
         <iframe
+          ref={iframeRef}
           src={embedUrl}
           className="w-full h-full border-0"
           allow="autoplay"
           allowFullScreen
           title={title}
         />
+        
+        {/* Navigation Arrows for presentations */}
+        {isPresentation && (
+          <>
+            {/* Left Arrow - Previous Slide */}
+            <button
+              onClick={() => navigateSlide('prev')}
+              className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-all duration-200 shadow-lg hover:scale-110"
+              title="Previous slide"
+              aria-label="Previous slide"
+            >
+              <ChevronLeft className="w-8 h-8" />
+            </button>
+            
+            {/* Right Arrow - Next Slide */}
+            <button
+              onClick={() => navigateSlide('next')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-all duration-200 shadow-lg hover:scale-110"
+              title="Next slide"
+              aria-label="Next slide"
+            >
+              <ChevronRight className="w-8 h-8" />
+            </button>
+            
+            {/* Slide indicator */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 px-4 py-2 bg-black/60 rounded-full text-white text-sm font-medium">
+              Slide {currentSlide}
+            </div>
+          </>
+        )}
       </div>
     </>
   );
