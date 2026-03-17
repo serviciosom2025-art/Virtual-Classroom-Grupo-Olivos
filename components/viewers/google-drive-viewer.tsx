@@ -14,7 +14,6 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isPresentation, setIsPresentation] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -22,8 +21,7 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
       // Convert Google Drive sharing link to embed/preview link
       const converted = convertGoogleDriveUrl(url);
       if (converted) {
-        setEmbedUrl(converted.url);
-        setIsPresentation(converted.isPresentation);
+        setEmbedUrl(converted);
         setError(null);
       } else {
         setError("Could not process the Google Drive link. Please ensure it's a valid sharing link.");
@@ -49,7 +47,7 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
   }, []);
 
   // Convert various Google Drive URL formats to embeddable preview URL
-  function convertGoogleDriveUrl(originalUrl: string): { url: string; isPresentation: boolean } | null {
+  function convertGoogleDriveUrl(originalUrl: string): string | null {
     // Handle different Google Drive URL formats
     
     // Format 1: https://drive.google.com/file/d/FILE_ID/view?usp=sharing
@@ -80,28 +78,18 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
       return null;
     }
 
-    // Determine if it's a Google Docs/Slides/Sheets or a regular file
-    // Also check if file name suggests it's a PowerPoint
-    const isPptx = originalUrl.toLowerCase().includes('.pptx') || 
-                   originalUrl.toLowerCase().includes('.ppt') ||
-                   originalUrl.includes("docs.google.com/presentation");
-    
     if (originalUrl.includes("docs.google.com/presentation")) {
-      // Google Slides - use embed URL with rm=minimal to hide branding
-      return { 
-        url: `https://docs.google.com/presentation/d/${fileId}/embed?start=false&loop=false&delayms=3000&rm=minimal`,
-        isPresentation: true 
-      };
+      // Google Slides - use pub URL which includes navigation controls (back/forward arrows)
+      return `https://docs.google.com/presentation/d/${fileId}/pub?start=false&loop=false&delayms=60000`;
     } else if (originalUrl.includes("docs.google.com/document")) {
       // Google Docs - use preview URL
-      return { url: `https://docs.google.com/document/d/${fileId}/preview?rm=minimal`, isPresentation: false };
+      return `https://docs.google.com/document/d/${fileId}/preview?rm=minimal`;
     } else if (originalUrl.includes("docs.google.com/spreadsheets")) {
       // Google Sheets - use preview URL
-      return { url: `https://docs.google.com/spreadsheets/d/${fileId}/preview?rm=minimal`, isPresentation: false };
+      return `https://docs.google.com/spreadsheets/d/${fileId}/preview?rm=minimal`;
     } else {
-      // Regular file (PDF, PPTX, etc.) - use preview URL that prevents download
-      // PPTX files from Drive also need navigation arrows
-      return { url: `https://drive.google.com/file/d/${fileId}/preview?rm=minimal`, isPresentation: isPptx };
+      // Regular file (PDF, PPTX, etc.) - use preview URL
+      return `https://drive.google.com/file/d/${fileId}/preview?rm=minimal`;
     }
   }
 
@@ -153,12 +141,7 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
           allowFullScreen
           title={title}
         />
-        {/* Navigation hint for presentations */}
-        {isPresentation && (
-          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 px-4 py-2 bg-blue-600 rounded-lg text-white text-sm font-medium shadow-lg">
-            Click inside the presentation, then use arrow keys or click the arrows below to navigate
-          </div>
-        )}
+        
         {/* Small overlay to cover just the popup icon in top-right */}
         <div className="absolute top-0 right-0 w-12 h-12 bg-slate-900 pointer-events-none" />
       </div>
@@ -193,12 +176,7 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
           title={title}
         />
         
-        {/* Navigation hint for presentations */}
-        {isPresentation && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 px-4 py-2 bg-blue-600 rounded-lg text-white text-xs font-medium shadow-lg">
-            Click inside, then use arrow keys to navigate
-          </div>
-        )}
+        
       </div>
     </>
   );
