@@ -46,65 +46,33 @@ export default function StudentCoursesPage() {
       }
     });
     
-    // Check if a folder has any accessible content (files or accessible subfolders)
-    const hasAccessibleContent = (folderId: string): boolean => {
-      // Check for files in this folder
-      const folderFiles = allFiles.filter(f => f.folder_id === folderId);
-      if (folderFiles.length > 0) {
-        return true;
-      }
-      
-      // Check children recursively - only accessible children
-      const childFolders = allFolders.filter(f => f.parent_id === folderId);
-      for (const child of childFolders) {
-        // Only consider child if it's directly accessible
-        if (directlyAccessibleFolderIds.has(child.id)) {
-          if (hasAccessibleContent(child.id)) {
-            return true;
-          }
-        }
-      }
-      
-      return false;
-    };
+    // Build set of folders to hide (restricted folders that are children of hidden folders)
+    const hiddenFolderIds = new Set<string>();
     
-    // Build the final set of folders to show
-    // A folder is shown if:
-    // 1. It's directly accessible, AND
-    // 2. It has accessible content OR it's needed as a path to accessible content
-    const foldersToShow = new Set<string>();
-    
-    // First, find all directly accessible folders that have content
-    const accessibleWithContent = new Set<string>();
+    // First pass: mark directly restricted folders without permission as hidden
     allFolders.forEach(folder => {
-      if (directlyAccessibleFolderIds.has(folder.id) && hasAccessibleContent(folder.id)) {
-        accessibleWithContent.add(folder.id);
+      if (folder.is_restricted && !permittedFolderIds.has(folder.id)) {
+        hiddenFolderIds.add(folder.id);
       }
     });
     
-    // Now add these folders and their accessible ancestors
-    accessibleWithContent.forEach(folderId => {
-      foldersToShow.add(folderId);
-      
-      // Walk up the tree, only adding ancestors that are accessible
-      let currentFolder = allFolders.find(f => f.id === folderId);
-      while (currentFolder?.parent_id) {
-        const parentId = currentFolder.parent_id;
-        // Only add parent if it's accessible (not restricted or has permission)
-        if (directlyAccessibleFolderIds.has(parentId)) {
-          foldersToShow.add(parentId);
+    // Second pass: cascade hiding to children of hidden folders
+    let changed = true;
+    while (changed) {
+      changed = false;
+      allFolders.forEach(folder => {
+        if (!hiddenFolderIds.has(folder.id) && folder.parent_id && hiddenFolderIds.has(folder.parent_id)) {
+          hiddenFolderIds.add(folder.id);
+          changed = true;
         }
-        currentFolder = allFolders.find(f => f.id === parentId);
-      }
-    });
+      });
+    }
     
-    // Filter folders - only show folders that are both accessible and in foldersToShow
-    const filteredFolders = allFolders.filter(folder => 
-      foldersToShow.has(folder.id) && directlyAccessibleFolderIds.has(folder.id)
-    );
+    // Filter folders - show all accessible folders except hidden ones
+    const filteredFolders = allFolders.filter(folder => !hiddenFolderIds.has(folder.id));
     
-    // Filter files - only show files in directly accessible folders
-    const filteredFiles = allFiles.filter(file => directlyAccessibleFolderIds.has(file.folder_id));
+    // Filter files - only show files in accessible (non-hidden) folders
+    const filteredFiles = allFiles.filter(file => !hiddenFolderIds.has(file.folder_id));
     
     return { filteredFolders, filteredFiles };
   }, [user]);
