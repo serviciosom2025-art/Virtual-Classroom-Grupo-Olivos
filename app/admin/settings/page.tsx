@@ -89,6 +89,7 @@ export default function SettingsPage() {
           background_color: settings.background_color,
           background_image_url: backgroundUrl,
           use_background_image: settings.use_background_image,
+          allow_teacher_file_upload: settings.allow_teacher_file_upload ?? true,
           updated_at: new Date().toISOString(),
         })
         .eq("id", settings.id);
@@ -251,6 +252,30 @@ export default function SettingsPage() {
                 />
               </div>
             </Field>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-white shadow-sm">
+        <CardHeader>
+          <CardTitle>Teacher Permissions</CardTitle>
+          <CardDescription>Control what teachers can do</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor="allow-teacher-upload" className="font-medium">Allow File Upload</Label>
+              <p className="text-sm text-muted-foreground">
+                When enabled, teachers can upload files from their computer. When disabled, they can only add links.
+              </p>
+            </div>
+            <Switch
+              checked={settings.allow_teacher_file_upload ?? true}
+              onCheckedChange={(checked) =>
+                setSettings({ ...settings, allow_teacher_file_upload: checked })
+              }
+              id="allow-teacher-upload"
+            />
           </div>
         </CardContent>
       </Card>
