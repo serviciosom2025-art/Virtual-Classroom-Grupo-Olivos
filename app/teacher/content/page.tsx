@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { FolderPlus, Upload, Folder, FileText, Video, Presentation, Trash2, ChevronRight, ChevronDown, Link2, X, Users, Lock, ListOrdered, FileSpreadsheet, PanelLeftClose, PanelLeft, GraduationCap } from "lucide-react"
+import { FolderPlus, Upload, Folder, FileText, Video, Presentation, Trash2, ChevronRight, ChevronDown, Link2, X, Users, Lock, ListOrdered, FileSpreadsheet, PanelLeftClose, PanelLeft, GraduationCap, Pencil } from "lucide-react"
 import { FileViewer } from "@/components/viewers/file-viewer"
 import { FolderPermissionsDialog } from "@/components/folders/folder-permissions-dialog"
 import { TeacherPermissionsDialog } from "@/components/folders/teacher-permissions-dialog"
@@ -64,6 +64,11 @@ export default function TeacherContentPage() {
   // File order dialog state
   const [fileOrderDialogOpen, setFileOrderDialogOpen] = useState(false)
   const [fileOrderFolderId, setFileOrderFolderId] = useState<string | null>(null)
+  
+  // Rename folder dialog state
+  const [renameFolderDialogOpen, setRenameFolderDialogOpen] = useState(false)
+  const [renameFolderId, setRenameFolderId] = useState<string | null>(null)
+  const [renameFolderName, setRenameFolderName] = useState("")
   
   // Folder panel collapse state
   const [folderPanelCollapsed, setFolderPanelCollapsed] = useState(false)
@@ -430,6 +435,27 @@ export default function TeacherContentPage() {
     loadFolders()
   }
 
+  const handleRenameFolder = async () => {
+    if (!renameFolderId || !renameFolderName.trim()) return
+
+    const supabase = createClient()
+    await supabase
+      .from("folders")
+      .update({ name: renameFolderName.trim() })
+      .eq("id", renameFolderId)
+    
+    setRenameFolderDialogOpen(false)
+    setRenameFolderId(null)
+    setRenameFolderName("")
+    loadFolders()
+  }
+
+  const openRenameDialog = (folderId: string, currentName: string) => {
+    setRenameFolderId(folderId)
+    setRenameFolderName(currentName)
+    setRenameFolderDialogOpen(true)
+  }
+
   const getFileIcon = (file: FileItem) => {
     const type = file.type;
     const url = file.external_url || "";
@@ -499,21 +525,35 @@ export default function TeacherContentPage() {
           {folder.is_teacher_restricted && (
             <GraduationCap className="h-3 w-3 text-blue-500" title="Teacher access restricted" />
           )}
-          {/* Teacher Access button - only show if current user created this folder */}
+          {/* Rename and Teacher Access buttons - only show if current user created this folder */}
           {isCreator && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 opacity-0 group-hover:opacity-100"
-              title="Teacher Access"
-              onClick={(e) => {
-                e.stopPropagation()
-                setTeacherPermissionsFolderId(folder.id)
-                setTeacherPermissionsDialogOpen(true)
-              }}
-            >
-              <GraduationCap className="h-3 w-3 text-blue-500" />
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                title="Rename Folder"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  openRenameDialog(folder.id, folder.name)
+                }}
+              >
+                <Pencil className="h-3 w-3 text-muted-foreground" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                title="Teacher Access"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setTeacherPermissionsFolderId(folder.id)
+                  setTeacherPermissionsDialogOpen(true)
+                }}
+              >
+                <GraduationCap className="h-3 w-3 text-blue-500" />
+              </Button>
+            </>
           )}
           {canEdit && (
             <>
@@ -981,6 +1021,41 @@ export default function TeacherContentPage() {
           />
         );
       })()}
+
+      {/* Rename Folder Dialog */}
+      <Dialog open={renameFolderDialogOpen} onOpenChange={setRenameFolderDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Folder</DialogTitle>
+            <DialogDescription>
+              Enter a new name for this folder.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Field>
+              <FieldLabel>Folder Name</FieldLabel>
+              <Input
+                value={renameFolderName}
+                onChange={(e) => setRenameFolderName(e.target.value)}
+                placeholder="Enter folder name"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleRenameFolder()
+                  }
+                }}
+              />
+            </Field>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameFolderDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleRenameFolder} disabled={!renameFolderName.trim()}>
+              Rename
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
