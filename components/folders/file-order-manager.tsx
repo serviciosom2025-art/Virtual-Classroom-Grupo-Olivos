@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { GripVertical, FileText, Video, Presentation, Link2, Lock, Unlock } from "lucide-react";
+import { GripVertical, FileText, Video, Presentation, PlayCircle, Lock, Unlock } from "lucide-react";
 import type { FileItem, Folder } from "@/lib/types";
 
 interface FileOrderManagerProps {
@@ -74,7 +74,7 @@ export function FileOrderManager({
       case "video":
         return <Video className="h-4 w-4 text-blue-500" />;
       case "external_video":
-        return <Link2 className="h-4 w-4 text-purple-500" />;
+        return <PlayCircle className="h-4 w-4 text-purple-500" />;
       case "pdf":
         return <FileText className="h-4 w-4 text-red-500" />;
       case "powerpoint":

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronRight, Folder, FolderOpen, FileVideo, FileText, Presentation, Link2, Lock, CheckCircle } from "lucide-react";
+import { ChevronRight, Folder, FolderOpen, FileVideo, FileText, Presentation, Lock, CheckCircle, PlayCircle } from "lucide-react";
 import type { Folder as FolderType, FileItem } from "@/lib/types";
 
 interface FolderTreeProps {
@@ -87,7 +87,7 @@ export function FolderTree({
       case "video":
         return <FileVideo className="w-4 h-4 text-purple-500" />;
       case "external_video":
-        return <Link2 className="w-4 h-4 text-indigo-500" />;
+        return <PlayCircle className="w-4 h-4 text-purple-500" />;
       case "pdf":
         return <FileText className="w-4 h-4 text-red-500" />;
       case "powerpoint":
