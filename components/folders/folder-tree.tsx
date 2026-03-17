@@ -65,16 +65,23 @@ export function FolderTree({
     const url = file.external_url || "";
     const name = file.name.toLowerCase();
     
-    // Handle Google Drive documents - detect PPT vs PDF
+    // Handle Google Drive documents - detect Video vs PPT vs PDF
     if (type === "google_drive_document") {
+      // Check if it's a video link (YouTube, Vimeo, or video file)
+      const isVideo = url.includes("youtube.com") || 
+                      url.includes("youtu.be") || 
+                      url.includes("vimeo.com") ||
+                      url.includes("drive.google.com/file") && (name.endsWith(".mp4") || name.endsWith(".webm") || name.endsWith(".mov"));
       const isPPT = url.includes("/presentation/") || 
                     url.includes("docs.google.com/presentation") ||
                     name.endsWith(".pptx") || 
                     name.endsWith(".ppt");
-      const isPDF = url.includes("/file/d/") && !isPPT ||
+      const isPDF = (url.includes("/file/d/") && !isPPT && !isVideo) ||
                     name.endsWith(".pdf");
       
-      if (isPPT) {
+      if (isVideo) {
+        return <PlayCircle className="w-4 h-4 text-purple-500" />;
+      } else if (isPPT) {
         return <Presentation className="w-4 h-4 text-orange-500" />;
       } else if (isPDF) {
         return <FileText className="w-4 h-4 text-red-500" />;
