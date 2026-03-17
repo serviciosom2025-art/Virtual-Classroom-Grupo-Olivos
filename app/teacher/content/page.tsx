@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { FolderPlus, Upload, Folder, FileText, Video, Presentation, Trash2, ChevronRight, ChevronDown, Link2, X, Users, Lock, ListOrdered, FileSpreadsheet, PanelLeftClose, PanelLeft, GraduationCap, Pencil } from "lucide-react"
+import { FolderPlus, Upload, Folder, FileText, Video, Presentation, Trash2, ChevronRight, ChevronDown, Link2, X, Users, Lock, ListOrdered, FileSpreadsheet, PanelLeftClose, PanelLeft, GraduationCap, Pencil, PlayCircle } from "lucide-react"
 import { FileViewer } from "@/components/viewers/file-viewer"
 import { FolderPermissionsDialog } from "@/components/folders/folder-permissions-dialog"
 import { TeacherPermissionsDialog } from "@/components/folders/teacher-permissions-dialog"
@@ -509,7 +509,7 @@ export default function TeacherContentPage() {
       case "video":
         return <Video className="h-4 w-4 text-blue-500" />;
       case "external_video":
-        return <Link2 className="h-4 w-4 text-purple-500" />;
+        return <PlayCircle className="h-4 w-4 text-purple-500" />;
       case "pdf":
         return <FileText className="h-4 w-4 text-red-500" />;
       case "powerpoint":

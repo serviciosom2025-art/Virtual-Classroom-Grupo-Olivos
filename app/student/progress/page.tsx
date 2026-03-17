@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CheckCircle2, Clock, BookOpen, FileText, Video, Presentation, Award } from "lucide-react"
+import { CheckCircle2, Clock, BookOpen, FileText, Video, Presentation, Award, PlayCircle } from "lucide-react"
 import type { StudentProgress, ExamResult, File, Folder } from "@/lib/types"
 
 interface ProgressWithDetails extends StudentProgress {
@@ -100,7 +100,7 @@ export default function StudentProgressPage() {
     
     switch (type) {
       case "video": return <Video className="h-4 w-4 text-purple-500" />
-      case "external_video": return <Video className="h-4 w-4 text-indigo-500" />
+      case "external_video": return <PlayCircle className="h-4 w-4 text-purple-500" />
       case "pdf": return <FileText className="h-4 w-4 text-red-500" />
       case "powerpoint": return <Presentation className="h-4 w-4 text-orange-500" />
       default: return <BookOpen className="h-4 w-4" />
