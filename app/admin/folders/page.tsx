@@ -10,6 +10,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -33,6 +34,7 @@ import {
   PanelLeftClose,
   PanelLeft,
   GraduationCap,
+  Pencil,
 } from "lucide-react";
 import { FolderPermissionsDialog } from "@/components/folders/folder-permissions-dialog";
 import { TeacherPermissionsDialog } from "@/components/folders/teacher-permissions-dialog";
@@ -85,6 +87,10 @@ export default function FoldersPage() {
   const [documentLinkOpen, setDocumentLinkOpen] = useState(false);
   const [documentLinkName, setDocumentLinkName] = useState("");
   const [documentLinkUrl, setDocumentLinkUrl] = useState("");
+  
+  // Rename file dialog state
+  const [renameFileOpen, setRenameFileOpen] = useState(false);
+  const [renameFileName, setRenameFileName] = useState("");
   
   // Folder panel collapse state
   const [folderPanelCollapsed, setFolderPanelCollapsed] = useState(false);
@@ -299,6 +305,33 @@ export default function FoldersPage() {
     if (!error) {
       setSelectedFile(null);
       fetchData();
+    }
+  };
+
+  const handleRenameFile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedFile || !renameFileName.trim()) return;
+    setFormLoading(true);
+
+    const { error } = await supabase
+      .from("files")
+      .update({ name: renameFileName.trim() })
+      .eq("id", selectedFile.id);
+
+    if (!error) {
+      setRenameFileName("");
+      setRenameFileOpen(false);
+      // Update the selected file with new name
+      setSelectedFile({ ...selectedFile, name: renameFileName.trim() });
+      fetchData();
+    }
+    setFormLoading(false);
+  };
+
+  const openRenameFileDialog = () => {
+    if (selectedFile) {
+      setRenameFileName(selectedFile.name);
+      setRenameFileOpen(true);
     }
   };
 
@@ -630,10 +663,16 @@ export default function FoldersPage() {
                 )}
               </div>
               {selectedFile && (
-                <Button size="sm" variant="destructive" onClick={() => handleDeleteFile(selectedFile.id)}>
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete File
-                </Button>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={openRenameFileDialog}>
+                    <Pencil className="w-4 h-4 mr-2" />
+                    Rename File
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => handleDeleteFile(selectedFile.id)}>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete File
+                  </Button>
+                </div>
               )}
             </div>
           </CardContent>
@@ -661,6 +700,38 @@ export default function FoldersPage() {
                 <Button type="submit" disabled={formLoading} className="bg-blue-600 hover:bg-blue-700">
                   {formLoading && <Spinner className="w-4 h-4 mr-2" />}
                   Save
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Rename File Dialog */}
+        <Dialog open={renameFileOpen} onOpenChange={setRenameFileOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Rename File</DialogTitle>
+              <DialogDescription>
+                Enter a new name for this file.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleRenameFile} className="space-y-4 mt-4">
+              <Field>
+                <FieldLabel>File Name</FieldLabel>
+                <Input
+                  value={renameFileName}
+                  onChange={(e) => setRenameFileName(e.target.value)}
+                  placeholder="Enter file name"
+                  required
+                />
+              </Field>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setRenameFileOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={formLoading || !renameFileName.trim()} className="bg-blue-600 hover:bg-blue-700">
+                  {formLoading && <Spinner className="w-4 h-4 mr-2" />}
+                  Rename
                 </Button>
               </div>
             </form>

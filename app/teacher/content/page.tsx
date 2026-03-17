@@ -70,6 +70,11 @@ export default function TeacherContentPage() {
   const [renameFolderId, setRenameFolderId] = useState<string | null>(null)
   const [renameFolderName, setRenameFolderName] = useState("")
   
+  // Rename file dialog state
+  const [renameFileDialogOpen, setRenameFileDialogOpen] = useState(false)
+  const [renameFileId, setRenameFileId] = useState<string | null>(null)
+  const [renameFileName, setRenameFileName] = useState("")
+  
   // Folder panel collapse state
   const [folderPanelCollapsed, setFolderPanelCollapsed] = useState(false)
   
@@ -456,6 +461,27 @@ export default function TeacherContentPage() {
     setRenameFolderDialogOpen(true)
   }
 
+  const handleRenameFile = async () => {
+    if (!renameFileId || !renameFileName.trim()) return
+
+    const supabase = createClient()
+    await supabase
+      .from("files")
+      .update({ name: renameFileName.trim() })
+      .eq("id", renameFileId)
+    
+    setRenameFileDialogOpen(false)
+    setRenameFileId(null)
+    setRenameFileName("")
+    loadFolders()
+  }
+
+  const openRenameFileDialog = (fileId: string, currentName: string) => {
+    setRenameFileId(fileId)
+    setRenameFileName(currentName)
+    setRenameFileDialogOpen(true)
+  }
+
   const getFileIcon = (file: FileItem) => {
     const type = file.type;
     const url = file.external_url || "";
@@ -600,32 +626,51 @@ export default function TeacherContentPage() {
 
         {isExpanded && (
           <>
-            {folder.files.map((file) => (
-              <div
-                key={file.id}
-                className={`flex items-center gap-2 p-2 rounded-lg hover:bg-muted transition-colors group cursor-pointer ${
-                  selectedFile?.id === file.id ? "bg-primary/10 border border-primary/30" : ""
-                }`}
-                style={{ paddingLeft: `${(depth + 1) * 16 + 24}px` }}
-                onClick={() => setSelectedFile(file)}
-              >
-                {getFileIcon(file)}
-                <span className="flex-1 text-sm">{file.name}</span>
-                {canEdit && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDeleteFile(file.id)
-                    }}
-                  >
-                    <Trash2 className="h-3 w-3 text-destructive" />
-                  </Button>
-                )}
-              </div>
-            ))}
+            {folder.files.map((file) => {
+              // Check if current user uploaded this file
+              const isFileUploader = file.uploaded_by === user?.id
+              return (
+                <div
+                  key={file.id}
+                  className={`flex items-center gap-2 p-2 rounded-lg hover:bg-muted transition-colors group cursor-pointer ${
+                    selectedFile?.id === file.id ? "bg-primary/10 border border-primary/30" : ""
+                  }`}
+                  style={{ paddingLeft: `${(depth + 1) * 16 + 24}px` }}
+                  onClick={() => setSelectedFile(file)}
+                >
+                  {getFileIcon(file)}
+                  <span className="flex-1 text-sm">{file.name}</span>
+                  {/* Rename button - show for file uploader */}
+                  {isFileUploader && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                      title="Rename File"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openRenameFileDialog(file.id, file.name)
+                      }}
+                    >
+                      <Pencil className="h-3 w-3 text-muted-foreground" />
+                    </Button>
+                  )}
+                  {canEdit && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteFile(file.id)
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3 text-destructive" />
+                    </Button>
+                  )}
+                </div>
+              )
+            })}
             {folder.children.map((child) => renderFolder(child, depth + 1))}
           </>
         )}
@@ -1051,6 +1096,41 @@ export default function TeacherContentPage() {
               Cancel
             </Button>
             <Button onClick={handleRenameFolder} disabled={!renameFolderName.trim()}>
+              Rename
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename File Dialog */}
+      <Dialog open={renameFileDialogOpen} onOpenChange={setRenameFileDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename File</DialogTitle>
+            <DialogDescription>
+              Enter a new name for this file.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Field>
+              <FieldLabel>File Name</FieldLabel>
+              <Input
+                value={renameFileName}
+                onChange={(e) => setRenameFileName(e.target.value)}
+                placeholder="Enter file name"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleRenameFile()
+                  }
+                }}
+              />
+            </Field>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameFileDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleRenameFile} disabled={!renameFileName.trim()}>
               Rename
             </Button>
           </DialogFooter>
