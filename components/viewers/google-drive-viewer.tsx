@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { FileText, Maximize2, Minimize2, ChevronLeft, ChevronRight } from "lucide-react";
+import { FileText, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface GoogleDriveViewerProps {
@@ -15,10 +15,7 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPresentation, setIsPresentation] = useState(false);
-  const [currentSlide, setCurrentSlide] = useState(1);
   const containerRef = useRef<HTMLDivElement>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const fullscreenIframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     try {
@@ -50,31 +47,6 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
   const toggleFullscreen = useCallback(() => {
     setIsFullscreen(prev => !prev);
   }, []);
-
-  // Navigate slides for presentations
-  const navigateSlide = useCallback((direction: 'prev' | 'next') => {
-    // Try to send keyboard event to the active iframe
-    const activeIframe = isFullscreen ? fullscreenIframeRef.current : iframeRef.current;
-    if (activeIframe) {
-      activeIframe.focus();
-      try {
-        // Try posting message to iframe
-        activeIframe.contentWindow?.postMessage({
-          type: 'keydown',
-          key: direction === 'next' ? 'ArrowRight' : 'ArrowLeft'
-        }, '*');
-      } catch {
-        // Cross-origin restriction
-      }
-    }
-    
-    // Update local slide counter for visual feedback
-    if (direction === 'next') {
-      setCurrentSlide(prev => prev + 1);
-    } else {
-      setCurrentSlide(prev => Math.max(1, prev - 1));
-    }
-  }, [isFullscreen]);
 
   // Convert various Google Drive URL formats to embeddable preview URL
   function convertGoogleDriveUrl(originalUrl: string): { url: string; isPresentation: boolean } | null {
@@ -175,41 +147,17 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
       {/* Document container - full width display */}
       <div className="flex-1 relative">
         <iframe
-          ref={fullscreenIframeRef}
           src={embedUrl}
           className="w-full h-full border-0"
           allow="autoplay"
           allowFullScreen
           title={title}
         />
-        {/* Navigation Arrows for presentations */}
+        {/* Navigation hint for presentations */}
         {isPresentation && (
-          <>
-            {/* Left Arrow - Previous Slide */}
-            <button
-              onClick={() => navigateSlide('prev')}
-              className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-14 h-14 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-all duration-200 shadow-lg hover:scale-110"
-              title="Previous slide"
-              aria-label="Previous slide"
-            >
-              <ChevronLeft className="w-10 h-10" />
-            </button>
-            
-            {/* Right Arrow - Next Slide */}
-            <button
-              onClick={() => navigateSlide('next')}
-              className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-14 h-14 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-all duration-200 shadow-lg hover:scale-110"
-              title="Next slide"
-              aria-label="Next slide"
-            >
-              <ChevronRight className="w-10 h-10" />
-            </button>
-            
-            {/* Slide indicator */}
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 px-5 py-2.5 bg-black/60 rounded-full text-white text-base font-medium">
-              Slide {currentSlide}
-            </div>
-          </>
+          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 px-4 py-2 bg-blue-600 rounded-lg text-white text-sm font-medium shadow-lg">
+            Click inside the presentation, then use arrow keys or click the arrows below to navigate
+          </div>
         )}
         {/* Small overlay to cover just the popup icon in top-right */}
         <div className="absolute top-0 right-0 w-12 h-12 bg-slate-900 pointer-events-none" />
@@ -238,7 +186,6 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
         
         {/* Document iframe - full size */}
         <iframe
-          ref={iframeRef}
           src={embedUrl}
           className="w-full h-full border-0"
           allow="autoplay"
@@ -246,34 +193,11 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
           title={title}
         />
         
-        {/* Navigation Arrows for presentations */}
+        {/* Navigation hint for presentations */}
         {isPresentation && (
-          <>
-            {/* Left Arrow - Previous Slide */}
-            <button
-              onClick={() => navigateSlide('prev')}
-              className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-all duration-200 shadow-lg hover:scale-110"
-              title="Previous slide"
-              aria-label="Previous slide"
-            >
-              <ChevronLeft className="w-8 h-8" />
-            </button>
-            
-            {/* Right Arrow - Next Slide */}
-            <button
-              onClick={() => navigateSlide('next')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-all duration-200 shadow-lg hover:scale-110"
-              title="Next slide"
-              aria-label="Next slide"
-            >
-              <ChevronRight className="w-8 h-8" />
-            </button>
-            
-            {/* Slide indicator */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 px-4 py-2 bg-black/60 rounded-full text-white text-sm font-medium">
-              Slide {currentSlide}
-            </div>
-          </>
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 px-4 py-2 bg-blue-600 rounded-lg text-white text-xs font-medium shadow-lg">
+            Click inside, then use arrow keys to navigate
+          </div>
         )}
       </div>
     </>
