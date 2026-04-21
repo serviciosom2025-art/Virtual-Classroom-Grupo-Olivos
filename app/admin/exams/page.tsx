@@ -61,10 +61,11 @@ export default function ExamsPage() {
   const { user } = useAuth();
   const [exams, setExams] = useState<Exam[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+const [loading, setLoading] = useState(true);
+  const [exams, setExams] = useState<Exam[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
   const [formLoading, setFormLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
   const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
   const [selectedExamForPermissions, setSelectedExamForPermissions] = useState<Exam | null>(null);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
@@ -140,38 +141,56 @@ export default function ExamsPage() {
   };
 
   const handleDeleteExam = async (examId: string) => {
+    if (actionLoading) return;
     if (!confirm("Are you sure? This will delete the exam and all its questions.")) return;
 
-    const { error } = await supabase.from("exams").delete().eq("id", examId);
-    if (!error) {
-      fetchData();
+    setActionLoading(true);
+    try {
+      const { error } = await supabase.from("exams").delete().eq("id", examId);
+      if (!error) {
+        await fetchData();
+      }
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const handleToggleActive = async (exam: Exam) => {
-    const { error } = await supabase
-      .from("exams")
-      .update({ is_active: !exam.is_active })
-      .eq("id", exam.id);
+    if (actionLoading) return;
+    
+    setActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from("exams")
+        .update({ is_active: !exam.is_active })
+        .eq("id", exam.id);
 
-    if (!error) {
-      fetchData();
+      if (!error) {
+        await fetchData();
+      }
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const handleRenameExam = async () => {
-    if (!examToRename || !newTitle.trim()) return;
+    if (!examToRename || !newTitle.trim() || actionLoading) return;
 
-    const { error } = await supabase
-      .from("exams")
-      .update({ title: newTitle.trim() })
-      .eq("id", examToRename.id);
+    setActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from("exams")
+        .update({ title: newTitle.trim() })
+        .eq("id", examToRename.id);
 
-    if (!error) {
-      setRenameDialogOpen(false);
-      setExamToRename(null);
-      setNewTitle("");
-      fetchData();
+      if (!error) {
+        setRenameDialogOpen(false);
+        setExamToRename(null);
+        setNewTitle("");
+        await fetchData();
+      }
+    } finally {
+      setActionLoading(false);
     }
   };
 

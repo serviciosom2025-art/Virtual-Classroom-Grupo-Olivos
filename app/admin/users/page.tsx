@@ -131,13 +131,20 @@ export default function UserManagementPage() {
   };
 
   const handleToggleActive = async (user: Profile) => {
-    const { error } = await supabase
-      .from("profiles")
-      .update({ is_active: !user.is_active })
-      .eq("id", user.id);
+    if (formLoading) return;
+    
+    setFormLoading(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ is_active: !user.is_active })
+        .eq("id", user.id);
 
-    if (!error) {
-      fetchUsers();
+      if (!error) {
+        await fetchUsers();
+      }
+    } finally {
+      setFormLoading(false);
     }
   };
 

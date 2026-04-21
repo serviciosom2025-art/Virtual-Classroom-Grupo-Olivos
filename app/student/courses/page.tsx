@@ -17,6 +17,7 @@ export default function StudentCoursesPage() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [progress, setProgress] = useState<StudentProgress[]>([]);
   const [loading, setLoading] = useState(true);
+  const [marking, setMarking] = useState(false);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
@@ -113,29 +114,34 @@ export default function StudentCoursesPage() {
   }, [fetchData]);
 
   const handleMarkComplete = async () => {
-    if (!user || !selectedFile) return;
+    if (!user || !selectedFile || marking) return;
+    
+    setMarking(true);
+    try {
+      const existingProgress = progress.find((p) => p.file_id === selectedFile.id);
 
-    const existingProgress = progress.find((p) => p.file_id === selectedFile.id);
+      if (existingProgress) {
+        await supabase
+          .from("student_progress")
+          .update({
+            status: existingProgress.status === "completed" ? "pending" : "completed",
+            completed_at: existingProgress.status === "completed" ? null : new Date().toISOString(),
+          })
+          .eq("id", existingProgress.id);
+      } else {
+        await supabase.from("student_progress").insert({
+          student_id: user.id,
+          file_id: selectedFile.id,
+          folder_id: selectedFile.folder_id,
+          status: "completed",
+          completed_at: new Date().toISOString(),
+        });
+      }
 
-    if (existingProgress) {
-      await supabase
-        .from("student_progress")
-        .update({
-          status: existingProgress.status === "completed" ? "pending" : "completed",
-          completed_at: existingProgress.status === "completed" ? null : new Date().toISOString(),
-        })
-        .eq("id", existingProgress.id);
-    } else {
-      await supabase.from("student_progress").insert({
-        student_id: user.id,
-        file_id: selectedFile.id,
-        folder_id: selectedFile.folder_id,
-        status: "completed",
-        completed_at: new Date().toISOString(),
-      });
+      await fetchData();
+    } finally {
+      setMarking(false);
     }
-
-    fetchData();
   };
 
   const isFileCompleted = (fileId: string) => {
@@ -225,13 +231,14 @@ export default function StudentCoursesPage() {
         )}
         <CardContent className="flex-1 h-full p-0 overflow-hidden">
           {selectedFile ? (
-            <FileViewer
-              file={selectedFile}
-              showProgress={true}
-              onMarkComplete={handleMarkComplete}
-              isCompleted={isFileCompleted(selectedFile.id)}
-              canDownload={false}
-            />
+<FileViewer
+                  file={selectedFile}
+                  showProgress={true}
+                  onMarkComplete={handleMarkComplete}
+                  isCompleted={isFileCompleted(selectedFile.id)}
+                  isMarking={marking}
+                  canDownload={false}
+                />
           ) : (
             <div className="h-full flex items-center justify-center text-slate-500">
               <div className="text-center">

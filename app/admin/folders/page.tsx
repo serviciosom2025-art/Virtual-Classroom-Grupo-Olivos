@@ -298,13 +298,19 @@ export default function FoldersPage() {
   };
 
   const handleDeleteFile = async (fileId: string) => {
+    if (formLoading) return;
     if (!confirm("Are you sure you want to delete this file?")) return;
 
-    const { error } = await supabase.from("files").delete().eq("id", fileId);
+    setFormLoading(true);
+    try {
+      const { error } = await supabase.from("files").delete().eq("id", fileId);
 
-    if (!error) {
-      setSelectedFile(null);
-      fetchData();
+      if (!error) {
+        setSelectedFile(null);
+        await fetchData();
+      }
+    } finally {
+      setFormLoading(false);
     }
   };
 
