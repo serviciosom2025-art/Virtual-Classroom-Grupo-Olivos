@@ -59,9 +59,7 @@ import { ExamPermissionsDialog } from "@/components/exams/exam-permissions-dialo
 
 export default function ExamsPage() {
   const { user } = useAuth();
-  const [exams, setExams] = useState<Exam[]>([]);
-  const [folders, setFolders] = useState<Folder[]>([]);
-const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [exams, setExams] = useState<Exam[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [formLoading, setFormLoading] = useState(false);
