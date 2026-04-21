@@ -39,6 +39,7 @@ export default function TeacherContentPage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploadFolderId, setUploadFolderId] = useState<string>("")
   const [uploading, setUploading] = useState(false)
+  const [actionInProgress, setActionInProgress] = useState(false)
   
   // External link states
   const [externalLinkName, setExternalLinkName] = useState("")
@@ -425,34 +426,51 @@ export default function TeacherContentPage() {
   }
 
   const handleDeleteFolder = async (folderId: string) => {
+    if (actionInProgress) return
     if (!confirm("Are you sure you want to delete this folder and all its contents?")) return
 
-    const supabase = createClient()
-    await supabase.from("folders").delete().eq("id", folderId)
-    loadFolders()
+    setActionInProgress(true)
+    try {
+      const supabase = createClient()
+      await supabase.from("folders").delete().eq("id", folderId)
+      await loadFolders()
+    } finally {
+      setActionInProgress(false)
+    }
   }
 
   const handleDeleteFile = async (fileId: string) => {
+    if (actionInProgress) return
     if (!confirm("Are you sure you want to delete this file?")) return
 
-    const supabase = createClient()
-    await supabase.from("files").delete().eq("id", fileId)
-    loadFolders()
+    setActionInProgress(true)
+    try {
+      const supabase = createClient()
+      await supabase.from("files").delete().eq("id", fileId)
+      await loadFolders()
+    } finally {
+      setActionInProgress(false)
+    }
   }
 
   const handleRenameFolder = async () => {
-    if (!renameFolderId || !renameFolderName.trim()) return
+    if (!renameFolderId || !renameFolderName.trim() || actionInProgress) return
 
-    const supabase = createClient()
-    await supabase
-      .from("folders")
-      .update({ name: renameFolderName.trim() })
-      .eq("id", renameFolderId)
-    
-    setRenameFolderDialogOpen(false)
-    setRenameFolderId(null)
-    setRenameFolderName("")
-    loadFolders()
+    setActionInProgress(true)
+    try {
+      const supabase = createClient()
+      await supabase
+        .from("folders")
+        .update({ name: renameFolderName.trim() })
+        .eq("id", renameFolderId)
+      
+      setRenameFolderDialogOpen(false)
+      setRenameFolderId(null)
+      setRenameFolderName("")
+      await loadFolders()
+    } finally {
+      setActionInProgress(false)
+    }
   }
 
   const openRenameDialog = (folderId: string, currentName: string) => {
@@ -462,18 +480,23 @@ export default function TeacherContentPage() {
   }
 
   const handleRenameFile = async () => {
-    if (!renameFileId || !renameFileName.trim()) return
+    if (!renameFileId || !renameFileName.trim() || actionInProgress) return
 
-    const supabase = createClient()
-    await supabase
-      .from("files")
-      .update({ name: renameFileName.trim() })
-      .eq("id", renameFileId)
-    
-    setRenameFileDialogOpen(false)
-    setRenameFileId(null)
-    setRenameFileName("")
-    loadFolders()
+    setActionInProgress(true)
+    try {
+      const supabase = createClient()
+      await supabase
+        .from("files")
+        .update({ name: renameFileName.trim() })
+        .eq("id", renameFileId)
+      
+      setRenameFileDialogOpen(false)
+      setRenameFileId(null)
+      setRenameFileName("")
+      await loadFolders()
+    } finally {
+      setActionInProgress(false)
+    }
   }
 
   const openRenameFileDialog = (fileId: string, currentName: string) => {

@@ -12,10 +12,11 @@ interface FileViewerProps {
   showProgress?: boolean;
   onMarkComplete?: () => void;
   isCompleted?: boolean;
+  isMarking?: boolean;
   canDownload?: boolean;
 }
 
-export function FileViewer({ file, showProgress, onMarkComplete, isCompleted, canDownload = true }: FileViewerProps) {
+export function FileViewer({ file, showProgress, onMarkComplete, isCompleted, isMarking = false, canDownload = true }: FileViewerProps) {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -24,13 +25,16 @@ export function FileViewer({ file, showProgress, onMarkComplete, isCompleted, ca
         {showProgress && onMarkComplete && (
           <button
             onClick={onMarkComplete}
+            disabled={isMarking}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               isCompleted
                 ? "bg-emerald-100 text-emerald-700"
+                : isMarking
+                ? "bg-blue-400 text-white cursor-not-allowed"
                 : "bg-blue-600 text-white hover:bg-blue-700"
             }`}
           >
-            {isCompleted ? "COMPLETED" : "MARK AS COMPLETED"}
+            {isMarking ? "SAVING..." : isCompleted ? "COMPLETED" : "MARK AS COMPLETED"}
           </button>
         )}
       </div>
