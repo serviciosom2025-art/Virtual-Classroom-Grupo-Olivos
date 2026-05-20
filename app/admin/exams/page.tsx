@@ -70,6 +70,7 @@ export default function ExamsPage() {
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [examToRename, setExamToRename] = useState<Exam | null>(null);
   const [newTitle, setNewTitle] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Form state
   const [newExam, setNewExam] = useState({
@@ -198,6 +199,8 @@ export default function ExamsPage() {
 
   const handleDuplicateExam = async (exam: Exam) => {
     if (!user) return;
+
+    const supabase = createClient();
 
     // Get questions for this exam
     const { data: questions } = await supabase
