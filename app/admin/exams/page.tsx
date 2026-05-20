@@ -83,9 +83,8 @@ export default function ExamsPage() {
     randomize_answers: true,
   });
 
-  const supabase = createClient();
-
   const fetchData = useCallback(async () => {
+    const supabase = createClient();
     try {
       const [examsRes, foldersRes] = await Promise.all([
         supabase.from("exams").select("*").order("created_at", { ascending: false }),
@@ -109,6 +108,7 @@ export default function ExamsPage() {
     if (!user) return;
     setFormLoading(true);
 
+    const supabase = createClient();
     const { error } = await supabase.from("exams").insert({
       title: newExam.title,
       description: newExam.description,
@@ -145,6 +145,7 @@ export default function ExamsPage() {
 
     setActionLoading(true);
     try {
+      const supabase = createClient();
       const { error } = await supabase.from("exams").delete().eq("id", examId);
       if (!error) {
         await fetchData();
@@ -159,6 +160,7 @@ export default function ExamsPage() {
     
     setActionLoading(true);
     try {
+      const supabase = createClient();
       const { error } = await supabase
         .from("exams")
         .update({ is_active: !exam.is_active })
@@ -177,6 +179,7 @@ export default function ExamsPage() {
 
     setActionLoading(true);
     try {
+      const supabase = createClient();
       const { error } = await supabase
         .from("exams")
         .update({ title: newTitle.trim() })
