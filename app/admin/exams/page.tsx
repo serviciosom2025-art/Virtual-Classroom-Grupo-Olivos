@@ -64,6 +64,7 @@ export default function ExamsPage() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [formLoading, setFormLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
   const [selectedExamForPermissions, setSelectedExamForPermissions] = useState<Exam | null>(null);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
