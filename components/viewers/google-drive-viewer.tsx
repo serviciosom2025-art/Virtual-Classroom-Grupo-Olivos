@@ -48,6 +48,17 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
 
   // Convert various Google Drive URL formats to embeddable preview URL
   function convertGoogleDriveUrl(originalUrl: string): string | null {
+    // Google Apps Script web apps are already embeddable URLs. Keep the
+    // deployment URL unchanged so its interactive controls work in the iframe.
+    try {
+      const parsedUrl = new URL(originalUrl);
+      if (parsedUrl.hostname === "script.google.com" && parsedUrl.pathname.startsWith("/macros/")) {
+        return parsedUrl.toString();
+      }
+    } catch {
+      return null;
+    }
+
     // Handle different Google Drive URL formats
     
     // Format 1: https://drive.google.com/file/d/FILE_ID/view?usp=sharing
@@ -116,6 +127,15 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
     );
   }
 
+  const isAppsScriptUrl = (() => {
+    try {
+      const parsedUrl = new URL(url);
+      return parsedUrl.hostname === "script.google.com" && parsedUrl.pathname.startsWith("/macros/");
+    } catch {
+      return false;
+    }
+  })();
+
   // Fullscreen overlay - rendered via Portal to escape parent overflow:hidden
   const fullscreenOverlay = isFullscreen ? createPortal(
     <div className="fixed inset-0 z-[9999] bg-black flex flex-col">
@@ -143,11 +163,13 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
           title={title}
         />
         
-        {/* Small overlay to cover just the popup icon in top-right */}
-        <div className="absolute top-0 right-0 w-12 h-12 bg-slate-900 z-10" />
-        
-        {/* Overlay to cover "Google Slides" branding in bottom-right - blocks hover/click */}
-        <div className="absolute bottom-0 right-0 w-36 h-10 bg-slate-800 z-10 cursor-default" />
+        {!isAppsScriptUrl && (
+          <>
+            {/* Keep the Google Drive viewer's popup affordance inside the classroom. */}
+            <div className="absolute top-0 right-0 w-12 h-12 bg-slate-900 z-10" />
+            <div className="absolute bottom-0 right-0 w-36 h-10 bg-slate-800 z-10 cursor-default" />
+          </>
+        )}
       </div>
     </div>,
     document.body
@@ -168,11 +190,13 @@ export function GoogleDriveViewer({ url, title }: GoogleDriveViewerProps) {
           Expand
         </Button>
         
-        {/* Small overlay to cover just the popup icon in top-right corner */}
-        <div className="absolute top-0 right-0 w-12 h-12 bg-slate-900 z-[5]" />
-        
-        {/* Overlay to cover "Google Slides" branding in bottom-right - blocks hover/click */}
-        <div className="absolute bottom-0 right-0 w-36 h-10 bg-slate-800 z-[5] cursor-default" />
+        {!isAppsScriptUrl && (
+          <>
+            {/* Keep the Google Drive viewer's popup affordance inside the classroom. */}
+            <div className="absolute top-0 right-0 w-12 h-12 bg-slate-900 z-[5]" />
+            <div className="absolute bottom-0 right-0 w-36 h-10 bg-slate-800 z-[5] cursor-default" />
+          </>
+        )}
         
         {/* Document iframe - full size */}
         <iframe
