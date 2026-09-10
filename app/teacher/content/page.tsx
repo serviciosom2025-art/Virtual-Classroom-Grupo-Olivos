@@ -388,12 +388,13 @@ export default function TeacherContentPage() {
   const handleAddDocumentLink = async () => {
     if (!documentLinkName.trim() || !documentLinkUrl.trim() || !documentLinkFolderId) return
 
-    // Validate URL is from Google Drive
-    const isGoogleDrive = documentLinkUrl.includes("drive.google.com") || 
-                          documentLinkUrl.includes("docs.google.com")
+    // Document links support Google Drive, Google Docs, and deployed Apps Script web apps.
+    const isGoogleLink = documentLinkUrl.includes("drive.google.com") ||
+                         documentLinkUrl.includes("docs.google.com")
+    const isAppsScript = /^https:\/\/script\.google\.com\/macros\//i.test(documentLinkUrl)
 
-    if (!isGoogleDrive) {
-      alert("Please enter a valid Google Drive link")
+    if (!isGoogleLink && !isAppsScript) {
+      alert("Please enter a valid Google Drive, Google Docs, or Google Apps Script web-app link")
       return
     }
 
