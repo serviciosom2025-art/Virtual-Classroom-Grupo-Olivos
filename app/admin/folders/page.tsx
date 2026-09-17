@@ -87,6 +87,11 @@ export default function FoldersPage() {
   const [documentLinkOpen, setDocumentLinkOpen] = useState(false);
   const [documentLinkName, setDocumentLinkName] = useState("");
   const [documentLinkUrl, setDocumentLinkUrl] = useState("");
+
+  // External classroom link states
+  const [classroomLinkOpen, setClassroomLinkOpen] = useState(false);
+  const [classroomLinkName, setClassroomLinkName] = useState("");
+  const [classroomLinkUrl, setClassroomLinkUrl] = useState("");
   
   // Rename file dialog state
   const [renameFileOpen, setRenameFileOpen] = useState(false);
@@ -253,6 +258,41 @@ export default function FoldersPage() {
       setExternalLinkName("");
       setExternalLinkUrl("");
       setExternalLinkOpen(false);
+      fetchData();
+    } else {
+      alert("Failed to add external link: " + error.message);
+    }
+    setFormLoading(false);
+  };
+
+  const handleAddClassroomLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!classroomLinkName.trim() || !classroomLinkUrl.trim() || !selectedFolderId || !user) return;
+
+    try {
+      const parsedUrl = new URL(classroomLinkUrl.trim());
+      if (parsedUrl.protocol !== "https:") throw new Error("invalid protocol");
+    } catch {
+      alert("Please enter a valid HTTPS link");
+      return;
+    }
+
+    setFormLoading(true);
+    const { error } = await supabase.from("files").insert({
+      name: classroomLinkName.trim(),
+      type: "external_link",
+      file_url: "",
+      external_url: classroomLinkUrl.trim(),
+      is_external: true,
+      folder_id: selectedFolderId,
+      uploaded_by: user.id,
+      file_size: 0,
+    });
+
+    if (!error) {
+      setClassroomLinkName("");
+      setClassroomLinkUrl("");
+      setClassroomLinkOpen(false);
       fetchData();
     } else {
       alert("Failed to add external link: " + error.message);
@@ -456,7 +496,36 @@ export default function FoldersPage() {
               <div className="flex items-center gap-2">
                 {selectedFolderId && (
                   <>
-                    <Dialog open={documentLinkOpen} onOpenChange={setDocumentLinkOpen}>
+                    <Dialog open={classroomLinkOpen} onOpenChange={setClassroomLinkOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="outline">
+                <Link2 className="w-4 h-4 mr-2" />
+                Add External Link
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add External Link</DialogTitle>
+                <DialogDescription>Display a web app in the classroom and open it in another window.</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleAddClassroomLink} className="space-y-4 mt-4">
+                <Field>
+                  <FieldLabel>Link Name</FieldLabel>
+                  <Input value={classroomLinkName} onChange={(e) => setClassroomLinkName(e.target.value)} placeholder="Enter a name for this link" required />
+                </Field>
+                <Field>
+                  <FieldLabel>Web Link</FieldLabel>
+                  <Input value={classroomLinkUrl} onChange={(e) => setClassroomLinkUrl(e.target.value)} placeholder="https://..." required />
+                </Field>
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => setClassroomLinkOpen(false)}>Cancel</Button>
+                  <Button type="submit" disabled={formLoading}>{formLoading ? "Adding..." : "Add External Link"}</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={documentLinkOpen} onOpenChange={setDocumentLinkOpen}>
                       <DialogTrigger asChild>
                         <Button size="sm" variant="outline">
                           <FileSpreadsheet className="w-4 h-4 mr-2" />

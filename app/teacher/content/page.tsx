@@ -53,6 +53,13 @@ export default function TeacherContentPage() {
   const [documentLinkUrl, setDocumentLinkUrl] = useState("")
   const [documentLinkFolderId, setDocumentLinkFolderId] = useState<string>("")
   const [savingDocumentLink, setSavingDocumentLink] = useState(false)
+
+  // External classroom link states
+  const [classroomLinkDialogOpen, setClassroomLinkDialogOpen] = useState(false)
+  const [classroomLinkName, setClassroomLinkName] = useState("")
+  const [classroomLinkUrl, setClassroomLinkUrl] = useState("")
+  const [classroomLinkFolderId, setClassroomLinkFolderId] = useState<string>("")
+  const [savingClassroomLink, setSavingClassroomLink] = useState(false)
   
   // Student permissions dialog state
   const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false)
@@ -383,6 +390,42 @@ export default function TeacherContentPage() {
     }
 
     setSavingExternalLink(false)
+  }
+
+  const handleAddClassroomLink = async () => {
+    if (!classroomLinkName.trim() || !classroomLinkUrl.trim() || !classroomLinkFolderId) return
+
+    try {
+      const parsedUrl = new URL(classroomLinkUrl.trim())
+      if (parsedUrl.protocol !== "https:") throw new Error("invalid protocol")
+    } catch {
+      alert("Please enter a valid HTTPS link")
+      return
+    }
+
+    setSavingClassroomLink(true)
+    const supabase = createClient()
+    const { error } = await supabase.from("files").insert({
+      name: classroomLinkName.trim(),
+      type: "external_link",
+      file_url: "",
+      external_url: classroomLinkUrl.trim(),
+      is_external: true,
+      folder_id: classroomLinkFolderId,
+      uploaded_by: user!.id,
+      file_size: 0,
+    })
+
+    if (!error) {
+      setClassroomLinkName("")
+      setClassroomLinkUrl("")
+      setClassroomLinkFolderId("")
+      setClassroomLinkDialogOpen(false)
+      loadFolders()
+    } else {
+      alert("Failed to add external link: " + error.message)
+    }
+    setSavingClassroomLink(false)
   }
 
   const handleAddDocumentLink = async () => {
@@ -772,6 +815,48 @@ export default function TeacherContentPage() {
                   Cancel
                 </Button>
                 <Button onClick={handleCreateFolder}>Create Folder</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={classroomLinkDialogOpen} onOpenChange={setClassroomLinkDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Link2 className="mr-2 h-4 w-4" />
+                Add External Link
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add External Link</DialogTitle>
+                <DialogDescription>Display a web app in the classroom and open it in another window.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <Field>
+                  <FieldLabel>Link Name</FieldLabel>
+                  <Input value={classroomLinkName} onChange={(e) => setClassroomLinkName(e.target.value)} placeholder="Enter a name for this link" />
+                </Field>
+                <Field>
+                  <FieldLabel>Web Link</FieldLabel>
+                  <Input value={classroomLinkUrl} onChange={(e) => setClassroomLinkUrl(e.target.value)} placeholder="https://..." />
+                </Field>
+                <Field>
+                  <FieldLabel>Select Folder</FieldLabel>
+                  <Select value={classroomLinkFolderId} onValueChange={setClassroomLinkFolderId}>
+                    <SelectTrigger><SelectValue placeholder="Select folder" /></SelectTrigger>
+                    <SelectContent>
+                      {allFolders.filter((folder) => folder.created_by === user?.id).map((folder) => (
+                        <SelectItem key={folder.id} value={folder.id}>{folder.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setClassroomLinkDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleAddClassroomLink} disabled={savingClassroomLink || !classroomLinkName || !classroomLinkUrl || !classroomLinkFolderId}>
+                  {savingClassroomLink ? "Adding..." : "Add External Link"}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
