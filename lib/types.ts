@@ -35,7 +35,7 @@ export interface FolderPermission {
 export interface FileItem {
   id: string;
   name: string;
-  type: "video" | "pdf" | "powerpoint" | "external_video" | "google_drive_document";
+  type: "video" | "pdf" | "powerpoint" | "external_video" | "google_drive_document" | "external_link";
   file_url: string;
   folder_id: string;
   uploaded_by: string;
