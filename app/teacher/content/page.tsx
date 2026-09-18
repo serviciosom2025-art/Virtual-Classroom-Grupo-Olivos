@@ -143,7 +143,13 @@ export default function TeacherContentPage() {
       
       // First pass: identify directly restricted folders without view access
       foldersData.forEach(folder => {
-        if (folder.is_teacher_restricted && !viewable.has(folder.id)) {
+        // A folder creator retains access to their own folder even when
+        // restricted teacher permissions are enabled.
+        if (
+          folder.is_teacher_restricted &&
+          folder.created_by !== user.id &&
+          !viewable.has(folder.id)
+        ) {
           hiddenFolderIds.add(folder.id)
         }
       })
@@ -266,8 +272,10 @@ export default function TeacherContentPage() {
     const folder = allFolders.find(f => f.id === folderId)
     // If folder is not restricted, all teachers can view
     if (!folder?.is_teacher_restricted) return true
-    // If restricted, check specific permissions
-    return viewableFolderIds.has(folderId)
+  // Folder creators retain access to their own restricted folders.
+  if (folder?.created_by === user?.id) return true
+  // If restricted, check specific permissions
+  return viewableFolderIds.has(folderId)
   }
   
   // Check if current user is the creator of a folder
