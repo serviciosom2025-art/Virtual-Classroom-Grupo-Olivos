@@ -237,10 +237,10 @@ export default function ExamTakingPage() {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const handleAnswer = (questionId: string, answer: string) => {
-    // Normalize the answer string to handle special characters (Spanish accents, etc.)
-    const normalizedAnswer = answer?.normalize("NFC") || "";
-    setAnswers((prev) => ({ ...prev, [questionId]: normalizedAnswer }));
+  const handleAnswer = (questionId: string, answer: unknown) => {
+    // Keep answer values consistent even when database options are numeric.
+    const normalizedAnswer = String(answer ?? "").normalize("NFC");
+    setAnswers((prev) => ({ ...prev, [String(questionId)]: normalizedAnswer }));
   };
 
   const handleSubmitExam = async () => {
@@ -460,9 +460,14 @@ export default function ExamTakingPage() {
   // Taking Exam Screen
   const currentQuestion = questions[currentQuestionIndex];
   const answeredCount = questions.filter((question) => {
-    const answer = answers[question.id];
+    const answer = answers[String(question.id)];
     return typeof answer === "string" && answer.trim().length > 0;
   }).length;
+  const goToNextQuestion = () => {
+    setCurrentQuestionIndex((previousIndex) =>
+      Math.min(previousIndex + 1, Math.max(questions.length - 1, 0)),
+    );
+  };
   const progressPercent = questions.length > 0 ? (answeredCount / questions.length) * 100 : 0;
 
   // Safety check - if no questions or invalid index or no options, show loading
@@ -568,7 +573,7 @@ export default function ExamTakingPage() {
           </Button>
         ) : (
           <Button
-            onClick={() => setCurrentQuestionIndex((prev) => prev + 1)}
+            onClick={goToNextQuestion}
             className="bg-blue-600 hover:bg-blue-700"
           >
             Next
@@ -583,7 +588,7 @@ export default function ExamTakingPage() {
           <p className="text-sm text-slate-500 mb-3">Jump to question:</p>
           <div className="flex flex-wrap gap-2">
             {questions.map((q, index) => {
-              const isAnswered = answers[q.id] !== undefined;
+              const isAnswered = typeof answers[String(q.id)] === "string" && answers[String(q.id)].trim().length > 0;
               const isCurrent = index === currentQuestionIndex;
               return (
                 <button
