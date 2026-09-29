@@ -250,15 +250,16 @@ export default function ExamTakingPage() {
 
     try {
       // Calculate score
-    let score = 0;
-    questions.forEach((q) => {
-      if (q.shuffledOptions && answers[q.id]) {
-        // Normalize strings for comparison to handle special characters (Spanish accents, etc.)
-        const normalizedAnswer = answers[q.id]?.normalize("NFC") || "";
-        const selectedOption = q.shuffledOptions.find((opt) => {
-          const normalizedOptValue = opt.value?.normalize("NFC") || "";
-          return normalizedAnswer === normalizedOptValue;
-        });
+      let score = 0;
+      questions.forEach((q) => {
+        const rawAnswer = answers[q.id];
+        if (q.shuffledOptions?.length && typeof rawAnswer === "string" && rawAnswer.trim()) {
+          // Normalize strings for comparison to handle special characters (Spanish accents, etc.)
+          const normalizedAnswer = rawAnswer.normalize("NFC");
+          const selectedOption = q.shuffledOptions.find((opt) => {
+            const normalizedOptValue = String(opt.value ?? "").normalize("NFC");
+            return normalizedAnswer === normalizedOptValue;
+          });
         if (selectedOption && selectedOption.key === q.correct_answer) {
           score++;
         }
