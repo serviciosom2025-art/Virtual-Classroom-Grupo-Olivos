@@ -244,11 +244,12 @@ export default function ExamTakingPage() {
   };
 
   const handleSubmitExam = async () => {
-    if (!user || !exam) return;
+    if (!user || !exam || submitting) return;
     setSubmitting(true);
     setShowSubmitDialog(false);
 
-    // Calculate score
+    try {
+      // Calculate score
     let score = 0;
     questions.forEach((q) => {
       if (q.shuffledOptions && answers[q.id]) {
@@ -268,7 +269,7 @@ export default function ExamTakingPage() {
     const attemptNumber = (existingResult?.attempts_used || 0) + 1;
 
     // Save attempt
-    await supabase.from("exam_attempts").insert({
+    const { error: attemptError } = await supabase.from("exam_attempts").insert({
       student_id: user.id,
       exam_id: examId,
       attempt_number: attemptNumber,
@@ -277,10 +278,11 @@ export default function ExamTakingPage() {
       answers,
       completed_at: new Date().toISOString(),
     });
+    if (attemptError) throw attemptError;
 
     // Update or create result
     if (existingResult) {
-      await supabase
+      const { error: resultUpdateError } = await supabase
         .from("exam_results")
         .update({
           highest_score: Math.max(existingResult.highest_score, score),
@@ -288,8 +290,9 @@ export default function ExamTakingPage() {
           updated_at: new Date().toISOString(),
         })
         .eq("id", existingResult.id);
+      if (resultUpdateError) throw resultUpdateError;
     } else {
-      await supabase.from("exam_results").insert({
+      const { error: resultInsertError } = await supabase.from("exam_results").insert({
         student_id: user.id,
         exam_id: examId,
         folder_id: exam.folder_id,
@@ -298,14 +301,18 @@ export default function ExamTakingPage() {
         attempts_used: attemptNumber,
         completed_at: new Date().toISOString(),
       });
+      if (resultInsertError) throw resultInsertError;
     }
 
-    setResult({ score, total: totalQuestions });
-    setExamState("result");
-    setSubmitting(false);
-    
-    // Unlock navigation when exam is complete
-    setExamInProgress(false);
+      setResult({ score, total: totalQuestions });
+      setExamState("result");
+      setExamInProgress(false);
+    } catch (error) {
+      console.error("Error submitting exam:", error);
+      setShowSubmitDialog(true);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading) {
@@ -451,7 +458,10 @@ export default function ExamTakingPage() {
 
   // Taking Exam Screen
   const currentQuestion = questions[currentQuestionIndex];
-  const answeredCount = Object.keys(answers).length;
+  const answeredCount = questions.filter((question) => {
+    const answer = answers[question.id];
+    return typeof answer === "string" && answer.trim().length > 0;
+  }).length;
   const progressPercent = questions.length > 0 ? (answeredCount / questions.length) * 100 : 0;
 
   // Safety check - if no questions or invalid index or no options, show loading
