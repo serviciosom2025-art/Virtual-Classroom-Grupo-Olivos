@@ -576,7 +576,7 @@ export default function ExamTakingPage() {
             onClick={goToNextQuestion}
             className="bg-blue-600 hover:bg-blue-700"
           >
-            Next
+            PROXIMO
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         )}
