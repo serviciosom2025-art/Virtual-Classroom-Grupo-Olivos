@@ -68,27 +68,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initAuth();
 
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState !== "visible") return;
-
-      // Backgrounded tabs can resume with an expired access token. Refresh the
-      // session before the next page action so Supabase requests remain usable.
-      const { data: { session } } = await supabase.auth.refreshSession();
-      if (session?.user) {
-        setUser(session.user);
-        await fetchProfile(session.user.id);
-        await fetchSettings();
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Only handle sign in/out events, ignore token refresh events to prevent unnecessary re-fetches
-      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Supabase holds an internal auth lock while invoking this callback. Keep
+      // the callback synchronous and defer database reads until that lock is free.
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
         setUser(session?.user ?? null);
         if (session?.user) {
-          await fetchProfile(session.user.id);
+          window.setTimeout(() => {
+            void fetchProfile(session.user.id);
+          }, 0);
         } else {
           setProfile(null);
         }
@@ -96,7 +84,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
       subscription.unsubscribe();
     };
   }, []);
