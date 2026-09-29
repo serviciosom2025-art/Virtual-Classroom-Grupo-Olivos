@@ -56,8 +56,21 @@ export default function ExamTakingPage() {
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ score: number; total: number } | null>(null);
+  const [isSpanish, setIsSpanish] = useState(false);
 
   const supabase = createClient();
+
+  useEffect(() => {
+    const updateLanguage = () => {
+      const language = document.documentElement.lang || navigator.language;
+      setIsSpanish(language.toLowerCase().startsWith("es"));
+    };
+
+    updateLanguage();
+    const observer = new MutationObserver(updateLanguage);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["lang"] });
+    return () => observer.disconnect();
+  }, []);
 
   const shuffleArray = <T,>(array: T[]): T[] => {
     const shuffled = [...array];
@@ -576,7 +589,7 @@ export default function ExamTakingPage() {
             onClick={goToNextQuestion}
             className="bg-blue-600 hover:bg-blue-700"
           >
-            PROXIMO
+            {isSpanish ? "PROXIMO" : "Next"}
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         )}
