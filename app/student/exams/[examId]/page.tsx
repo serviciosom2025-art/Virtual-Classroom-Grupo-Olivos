@@ -191,9 +191,8 @@ export default function ExamTakingPage() {
       event.returnValue = "";
     };
 
+    const examUrl = window.location.href;
     const handlePopState = () => {
-      window.history.pushState({ examGuard: true }, "", window.location.href);
-
       const message = isSpanish
         ? "Si sales del examen, contará como un intento. ¿Quieres salir?"
         : "Leaving this exam will count as an attempt. Do you want to leave?";
@@ -203,11 +202,13 @@ export default function ExamTakingPage() {
         window.removeEventListener("beforeunload", handleBeforeUnload);
         window.removeEventListener("pagehide", recordExitAttempt);
         window.removeEventListener("popstate", handlePopState);
-        window.history.back();
+        return;
       }
+
+      window.history.pushState({ examGuard: true }, "", examUrl);
     };
 
-    window.history.pushState({ examGuard: true }, "", window.location.href);
+    window.history.pushState({ examGuard: true }, "", examUrl);
     window.addEventListener("beforeunload", handleBeforeUnload);
     window.addEventListener("pagehide", recordExitAttempt);
     window.addEventListener("popstate", handlePopState);
