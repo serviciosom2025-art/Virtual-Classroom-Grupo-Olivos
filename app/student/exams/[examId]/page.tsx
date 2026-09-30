@@ -191,14 +191,33 @@ export default function ExamTakingPage() {
       event.returnValue = "";
     };
 
+    const handlePopState = () => {
+      window.history.pushState({ examGuard: true }, "", window.location.href);
+
+      const message = isSpanish
+        ? "Si sales del examen, contará como un intento. ¿Quieres salir?"
+        : "Leaving this exam will count as an attempt. Do you want to leave?";
+
+      if (window.confirm(message)) {
+        recordExitAttempt();
+        window.removeEventListener("beforeunload", handleBeforeUnload);
+        window.removeEventListener("pagehide", recordExitAttempt);
+        window.removeEventListener("popstate", handlePopState);
+        window.history.back();
+      }
+    };
+
+    window.history.pushState({ examGuard: true }, "", window.location.href);
     window.addEventListener("beforeunload", handleBeforeUnload);
     window.addEventListener("pagehide", recordExitAttempt);
+    window.addEventListener("popstate", handlePopState);
 
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
       window.removeEventListener("pagehide", recordExitAttempt);
+      window.removeEventListener("popstate", handlePopState);
     };
-  }, [exam, examId, examState, questions.length]);
+  }, [exam, examId, examState, isSpanish, questions.length]);
 
   // Cleanup exam lock on unmount
   useEffect(() => {
