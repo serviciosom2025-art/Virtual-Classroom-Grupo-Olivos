@@ -5,7 +5,8 @@ import { createContext, useContext, useState, ReactNode, useCallback, useEffect 
 interface ExamLockContextType {
   isExamInProgress: boolean;
   examTitle: string;
-  setExamInProgress: (inProgress: boolean, title?: string) => void;
+  examExitWarning: string;
+  setExamInProgress: (inProgress: boolean, title?: string, exitWarning?: string) => void;
 }
 
 const ExamLockContext = createContext<ExamLockContextType | undefined>(undefined);
@@ -13,19 +14,21 @@ const ExamLockContext = createContext<ExamLockContextType | undefined>(undefined
 export function ExamLockProvider({ children }: { children: ReactNode }) {
   const [isExamInProgress, setIsExamInProgress] = useState(false);
   const [examTitle, setExamTitle] = useState("");
+  const [examExitWarning, setExamExitWarning] = useState("");
 
-  const setExamInProgress = useCallback((inProgress: boolean, title?: string) => {
+  const setExamInProgress = useCallback((inProgress: boolean, title?: string, exitWarning?: string) => {
     setIsExamInProgress(inProgress);
     setExamTitle(title || "");
+    setExamExitWarning(exitWarning || "");
   }, []);
 
-  // Prevent browser back/forward navigation and page refresh during exam
+  // Warn before browser refresh, back, or tab close during an exam.
   useEffect(() => {
     if (!isExamInProgress) return;
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
-      e.returnValue = "You have an exam in progress. Are you sure you want to leave?";
+      e.returnValue = examExitWarning || "Refreshing or leaving this exam will count as an attempt.";
       return e.returnValue;
     };
 
@@ -34,10 +37,10 @@ export function ExamLockProvider({ children }: { children: ReactNode }) {
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, [isExamInProgress]);
+  }, [examExitWarning, isExamInProgress]);
 
   return (
-    <ExamLockContext.Provider value={{ isExamInProgress, examTitle, setExamInProgress }}>
+    <ExamLockContext.Provider value={{ isExamInProgress, examTitle, examExitWarning, setExamInProgress }}>
       {children}
     </ExamLockContext.Provider>
   );
