@@ -588,9 +588,10 @@ export default function ExamTakingPage() {
           <Button
             onClick={goToNextQuestion}
             className="bg-blue-600 hover:bg-blue-700"
+            translate="no"
           >
-            {isSpanish ? "PROXIMO" : "Next"}
-            <ArrowRight className="w-4 h-4 ml-2" />
+            <span translate="no">{isSpanish ? "PROXIMO" : "Next"}</span>
+            <ArrowRight className="w-4 h-4 ml-2" aria-hidden="true" />
           </Button>
         )}
       </div>
