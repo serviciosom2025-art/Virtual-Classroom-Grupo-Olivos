@@ -236,8 +236,14 @@ export default function ExamTakingPage() {
       setTimeLeft(exam.time_limit * 60);
     }
     
+    const attemptsUsed = existingResult?.attempts_used ?? 0;
+    const attemptsRemaining = Math.max(exam.max_attempts - attemptsUsed - 1, 0);
+    const attemptWarning = isSpanish
+      ? `Si actualizas o sales del examen, contará como un intento. Te quedará${attemptsRemaining === 1 ? "" : "n"} ${attemptsRemaining} intento${attemptsRemaining === 1 ? "" : "s"}.`
+      : `Refreshing or leaving this exam will count as an attempt. You will have ${attemptsRemaining} attempt${attemptsRemaining === 1 ? "" : "s"} left.`;
+
     // Lock navigation while taking exam
-    setExamInProgress(true, exam.title);
+    setExamInProgress(true, exam.title, attemptWarning);
     
     setExamState("taking");
     setAnswers({});
