@@ -46,12 +46,13 @@ export function Sidebar({ collapsed, onToggle, sidebarColor, isExamLocked = fals
   const role = profile?.role || "student";
 
   const handleNavigation = (href: string) => {
-    if (isExamLocked && !pathname.includes(href)) {
+    if (isExamLocked) {
       setPendingNavigation(href);
       setShowExamWarning(true);
-    } else {
-      router.push(href);
+      return;
     }
+
+    router.push(href);
   };
 
   const adminLinks = [
@@ -133,9 +134,9 @@ export function Sidebar({ collapsed, onToggle, sidebarColor, isExamLocked = fals
                     active
                       ? "bg-white/15 text-white"
                       : "text-white/70 hover:bg-white/10 hover:text-white",
-                    isExamLocked && !active && "opacity-50 cursor-not-allowed"
+                    isExamLocked && "opacity-50 cursor-not-allowed"
                   )}
-                  title={collapsed ? link.label : isExamLocked && !active ? "Complete the exam first" : undefined}
+                  title={collapsed ? link.label : isExamLocked ? "Complete the exam first" : undefined}
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
                   {!collapsed && <span className="truncate">{link.label}</span>}
