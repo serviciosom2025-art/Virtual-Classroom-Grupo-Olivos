@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -57,6 +57,7 @@ export default function ExamTakingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ score: number; total: number } | null>(null);
   const [isSpanish, setIsSpanish] = useState(false);
+  const exitAttemptRecorded = useRef(false);
 
   const supabase = createClient();
 
@@ -157,6 +158,47 @@ export default function ExamTakingPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Warn on refresh/back and record a consumed attempt only when the page really leaves.
+  useEffect(() => {
+    if (examState !== "taking" || !exam) return;
+
+    exitAttemptRecorded.current = false;
+
+    const recordExitAttempt = () => {
+      if (exitAttemptRecorded.current) return;
+      exitAttemptRecorded.current = true;
+
+      const payload = JSON.stringify({
+        examId,
+        folderId: exam.folder_id,
+        totalQuestions: questions.length,
+      });
+      const body = new Blob([payload], { type: "application/json" });
+
+      if (!navigator.sendBeacon("/api/student/exams/abandon", body)) {
+        void fetch("/api/student/exams/abandon", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: payload,
+          keepalive: true,
+        });
+      }
+    };
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("pagehide", recordExitAttempt);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("pagehide", recordExitAttempt);
+    };
+  }, [exam, examId, examState, questions.length]);
 
   // Cleanup exam lock on unmount
   useEffect(() => {
