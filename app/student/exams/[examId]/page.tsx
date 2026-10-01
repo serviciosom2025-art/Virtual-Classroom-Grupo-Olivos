@@ -202,7 +202,7 @@ export default function ExamTakingPage() {
         window.removeEventListener("beforeunload", handleBeforeUnload);
         window.removeEventListener("pagehide", recordExitAttempt);
         window.removeEventListener("popstate", handlePopState);
-        window.history.back();
+        window.location.replace(examUrl);
         return;
       }
 
