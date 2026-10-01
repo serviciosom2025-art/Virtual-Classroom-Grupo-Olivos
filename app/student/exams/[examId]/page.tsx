@@ -617,6 +617,7 @@ export default function ExamTakingPage() {
                 }`}
               >
                 <span
+                  translate="no"
                   className={`inline-flex items-center justify-center w-8 h-8 rounded-full mr-3 text-sm font-medium ${
                     isSelected ? "bg-blue-500 text-white" : "bg-slate-200 text-slate-600"
                   }`}
