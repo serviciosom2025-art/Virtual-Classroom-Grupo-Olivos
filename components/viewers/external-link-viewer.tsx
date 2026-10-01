@@ -8,7 +8,28 @@ interface ExternalLinkViewerProps {
   title: string;
 }
 
+function getEmbeddedUrl(url: string) {
+  try {
+    const parsedUrl = new URL(url);
+    const isLookerStudio = /(^|\.)((looker|data)studio)\.google\.com$/i.test(parsedUrl.hostname);
+
+    if (!isLookerStudio || !parsedUrl.pathname.includes("/reporting/")) {
+      return url;
+    }
+
+    parsedUrl.hostname = "lookerstudio.google.com";
+    parsedUrl.pathname = parsedUrl.pathname
+      .replace(/^\/u\/\d+/, "")
+      .replace("/reporting/", "/embed/reporting/");
+    return parsedUrl.toString();
+  } catch {
+    return url;
+  }
+}
+
 export function ExternalLinkViewer({ url, title }: ExternalLinkViewerProps) {
+  const viewerUrl = getEmbeddedUrl(url);
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-slate-100">
       <div className="flex items-center justify-between gap-3 border-b bg-white px-4 py-3">
@@ -21,10 +42,11 @@ export function ExternalLinkViewer({ url, title }: ExternalLinkViewerProps) {
         </Button>
       </div>
       <iframe
-        src={url}
+        src={viewerUrl}
         title={title}
         className="min-h-0 flex-1 border-0 bg-white"
-        allow="clipboard-read; clipboard-write"
+        allow="clipboard-read; clipboard-write; fullscreen"
+        allowFullScreen
       />
     </div>
   );
