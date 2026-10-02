@@ -39,6 +39,7 @@ import {
 import { FolderPermissionsDialog } from "@/components/folders/folder-permissions-dialog";
 import { TeacherPermissionsDialog } from "@/components/folders/teacher-permissions-dialog";
 import { FileOrderManager } from "@/components/folders/file-order-manager";
+import { FolderOrderManager } from "@/components/folders/folder-order-manager";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -71,6 +72,7 @@ export default function FoldersPage() {
   const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
   const [teacherPermissionsDialogOpen, setTeacherPermissionsDialogOpen] = useState(false);
   const [fileOrderDialogOpen, setFileOrderDialogOpen] = useState(false);
+  const [folderOrderDialogOpen, setFolderOrderDialogOpen] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
 
   // Form states
@@ -405,6 +407,9 @@ export default function FoldersPage() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg">Course Materials</CardTitle>
               <div className="flex items-center gap-1">
+                <Button size="sm" variant="ghost" onClick={() => setFolderOrderDialogOpen(true)} title="Sort main folders">
+                  <ListOrdered className="w-4 h-4" />
+                </Button>
                 <Dialog open={createFolderOpen} onOpenChange={setCreateFolderOpen}>
               <DialogTrigger asChild>
                 <Button size="sm" variant="ghost">
@@ -871,8 +876,15 @@ export default function FoldersPage() {
         />
       )}
 
-      {/* File Order Manager Dialog */}
-      {selectedFolderId && selectedFolderData && (
+  <FolderOrderManager
+    open={folderOrderDialogOpen}
+    onOpenChange={setFolderOrderDialogOpen}
+    folders={folders.filter((folder) => folder.parent_id === null)}
+    onSave={fetchData}
+  />
+
+  {/* File Order Manager Dialog */}
+  {selectedFolderId && selectedFolderData && (
         <FileOrderManager
           open={fileOrderDialogOpen}
           onOpenChange={setFileOrderDialogOpen}
