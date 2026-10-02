@@ -11,7 +11,7 @@ interface FolderOrderManagerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   folders: Folder[];
-  onSave: () => void;
+  onSave: () => Promise<void> | void;
 }
 
 export function FolderOrderManager({ open, onOpenChange, folders, onSave }: FolderOrderManagerProps) {
@@ -33,12 +33,24 @@ export function FolderOrderManager({ open, onOpenChange, folders, onSave }: Fold
   const handleSave = async () => {
     setSaving(true);
     const supabase = createClient();
+
     try {
-      for (const [index, folder] of orderedFolders.entries()) {
-        await supabase.from("folders").update({ position: index + 1 }).eq("id", folder.id);
-      }
-      onSave();
+      const results = await Promise.all(
+        orderedFolders.map((folder, index) =>
+          supabase
+            .from("folders")
+            .update({ position: index + 1 })
+            .eq("id", folder.id)
+            .is("parent_id", null),
+        ),
+      );
+      const failedUpdate = results.find(({ error }) => error);
+      if (failedUpdate?.error) throw failedUpdate.error;
+
+      await onSave();
       onOpenChange(false);
+    } catch (error) {
+      console.error("[v0] Failed to save folder order:", error);
     } finally {
       setSaving(false);
     }

@@ -101,8 +101,9 @@ export default function TeacherContentPage() {
     // Load all folders first
     const { data: foldersData } = await supabase
       .from("folders")
-      .select("*")
-      .order("name")
+.select("*")
+    .order("position", { ascending: true, nullsFirst: false })
+    .order("name")
 
     // Load all files
     const { data: filesData } = await supabase
