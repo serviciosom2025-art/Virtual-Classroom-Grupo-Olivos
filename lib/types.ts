@@ -17,6 +17,7 @@ export interface Folder {
   created_by: string;
   created_at: string;
   updated_at: string;
+  position?: number;
   is_restricted?: boolean;
   is_teacher_restricted?: boolean;
   sequential_order?: boolean;

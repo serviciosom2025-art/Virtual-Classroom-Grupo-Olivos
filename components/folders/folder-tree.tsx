@@ -34,6 +34,7 @@ export function FolderTree({
   const buildTree = (parentId: string | null): FolderType[] => {
     return folders
       .filter((f) => f.parent_id === parentId)
+      .sort((a, b) => (a.position || 0) - (b.position || 0))
       .map((folder) => ({
         ...folder,
         children: buildTree(folder.id),

@@ -14,6 +14,7 @@ import { FileViewer } from "@/components/viewers/file-viewer"
 import { FolderPermissionsDialog } from "@/components/folders/folder-permissions-dialog"
 import { TeacherPermissionsDialog } from "@/components/folders/teacher-permissions-dialog"
 import { FileOrderManager } from "@/components/folders/file-order-manager"
+import { FolderOrderManager } from "@/components/folders/folder-order-manager"
 import type { Folder as FolderType, FileItem } from "@/lib/types"
 
 interface FolderWithChildren extends FolderType {
@@ -72,6 +73,7 @@ export default function TeacherContentPage() {
   // File order dialog state
   const [fileOrderDialogOpen, setFileOrderDialogOpen] = useState(false)
   const [fileOrderFolderId, setFileOrderFolderId] = useState<string | null>(null)
+  const [folderOrderDialogOpen, setFolderOrderDialogOpen] = useState(false)
   
   // Rename folder dialog state
   const [renameFolderDialogOpen, setRenameFolderDialogOpen] = useState(false)
@@ -776,6 +778,10 @@ export default function TeacherContentPage() {
           <p className="text-muted-foreground">Manage your folders and learning materials</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setFolderOrderDialogOpen(true)}>
+            <ListOrdered className="mr-2 h-4 w-4" />
+            Sort Main Folders
+          </Button>
           <Dialog open={folderDialogOpen} onOpenChange={setFolderDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
@@ -1171,6 +1177,13 @@ export default function TeacherContentPage() {
           onSave={loadFolders}
         />
       )}
+
+      <FolderOrderManager
+        open={folderOrderDialogOpen}
+        onOpenChange={setFolderOrderDialogOpen}
+        folders={allFolders.filter((folder) => folder.parent_id === null)}
+        onSave={loadFolders}
+      />
 
       {/* File Order Manager Dialog */}
       {fileOrderFolderId && (() => {
