@@ -107,7 +107,7 @@ export default function FoldersPage() {
   const fetchData = useCallback(async () => {
     try {
       const [foldersRes, filesRes] = await Promise.all([
-        supabase.from("folders").select("*").order("name"),
+        supabase.from("folders").select("*").order("position", { ascending: true, nullsFirst: false }).order("name"),
         supabase.from("files").select("*").order("position, name"),
       ]);
 
