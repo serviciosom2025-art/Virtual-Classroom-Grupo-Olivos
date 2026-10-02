@@ -1,6 +1,7 @@
 "use client";
 
-import { ExternalLink } from "lucide-react";
+import { useState } from "react";
+import { ExternalLink, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ExternalLinkViewerProps {
@@ -28,18 +29,38 @@ function getEmbeddedUrl(url: string) {
 }
 
 export function ExternalLinkViewer({ url, title }: ExternalLinkViewerProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const viewerUrl = getEmbeddedUrl(url);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-slate-100">
+    <div
+      className={
+        isExpanded
+          ? "fixed inset-0 z-50 flex min-h-0 flex-col bg-slate-100"
+          : "flex h-full min-h-0 flex-col bg-slate-100"
+      }
+    >
       <div className="flex items-center justify-between gap-3 border-b bg-white px-4 py-3">
         <p className="truncate text-sm text-slate-600">{url}</p>
-        <Button asChild size="sm" variant="outline">
-          <a href={url} target="_blank" rel="noopener noreferrer">
-            <ExternalLink data-icon="inline-start" />
-            Open in new window
-          </a>
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => setIsExpanded((expanded) => !expanded)}
+            aria-label={isExpanded ? "Collapse report" : "Expand report"}
+            title={isExpanded ? "Collapse report" : "Expand report"}
+          >
+            {isExpanded ? <Minimize2 data-icon="inline-start" /> : <Maximize2 data-icon="inline-start" />}
+            {isExpanded ? "Collapse" : "Expand"}
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <a href={url} target="_blank" rel="noopener noreferrer">
+              <ExternalLink data-icon="inline-start" />
+              Open in new window
+            </a>
+          </Button>
+        </div>
       </div>
       <iframe
         src={viewerUrl}
