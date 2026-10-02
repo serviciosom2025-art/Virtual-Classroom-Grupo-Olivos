@@ -19,9 +19,14 @@ function getEmbeddedUrl(url: string) {
     }
 
     parsedUrl.hostname = "lookerstudio.google.com";
-    parsedUrl.pathname = parsedUrl.pathname
-      .replace(/^\/u\/\d+/, "")
-      .replace("/reporting/", "/embed/reporting/");
+    parsedUrl.pathname = parsedUrl.pathname.replace(/^\/u\/\d+/, "");
+
+    if (!parsedUrl.pathname.startsWith("/embed/reporting/")) {
+      parsedUrl.pathname = parsedUrl.pathname.replace(
+        "/reporting/",
+        "/embed/reporting/",
+      );
+    }
     return parsedUrl.toString();
   } catch {
     return url;
@@ -36,11 +41,11 @@ export function ExternalLinkViewer({ url, title }: ExternalLinkViewerProps) {
     <div
       className={
         isExpanded
-          ? "fixed inset-0 z-50 flex min-h-0 flex-col bg-slate-100"
+          ? "fixed inset-0 z-[9999] flex min-h-0 flex-col bg-slate-100"
           : "flex h-full min-h-0 flex-col bg-slate-100"
       }
     >
-      <div className="flex items-center justify-between gap-3 border-b bg-white px-4 py-3">
+      <div className="relative z-10 flex items-center justify-between gap-3 border-b bg-white px-4 py-3 shadow-sm">
         <p className="truncate text-sm text-slate-600">{url}</p>
         <div className="flex shrink-0 items-center gap-2">
           <Button
