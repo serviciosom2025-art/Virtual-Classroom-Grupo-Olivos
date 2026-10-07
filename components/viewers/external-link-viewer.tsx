@@ -20,7 +20,9 @@ function getEmbeddedUrl(url: string) {
     }
 
     parsedUrl.hostname = "lookerstudio.google.com";
-    parsedUrl.pathname = parsedUrl.pathname.replace(/^\/u\/\d+/, "");
+    parsedUrl.pathname = parsedUrl.pathname
+      .replace(/^\/embed\/u\/\d+/, "/embed")
+      .replace(/^\/u\/\d+/, "");
 
     if (!parsedUrl.pathname.startsWith("/embed/reporting/")) {
       parsedUrl.pathname = parsedUrl.pathname.replace(
